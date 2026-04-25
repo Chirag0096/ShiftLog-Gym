@@ -3,10 +3,10 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from ..models import ShiftLogAction
-from ..simulator import ShiftLogSimulator
+from ..trl_env import ShiftLogToolEnv
 
-simulator = ShiftLogSimulator()
 app = FastAPI(title="ShiftLog-Gym", version="0.1.0")
+session = ShiftLogToolEnv()
 
 
 @app.get("/")
@@ -15,32 +15,47 @@ def root():
         "name": "ShiftLog-Gym",
         "claim": "A domain-specific professional RL environment for memory management with causal incident dependencies and verifiable outcome rewards.",
         "status": "ok",
+        "multi_shift_mode": True,
+        "supports_noise_incidents": True,
     }
 
 
 @app.post("/reset")
 def reset(payload: dict | None = None):
+    global session
     payload = payload or {}
-    message = simulator.reset(
+    rollout_mode = payload.get("rollout_mode", "short")
+    session = ShiftLogToolEnv(
+        rollout_mode=rollout_mode,
+        multi_shift=bool(payload.get("multi_shift", False)),
+    )
+    message = session.reset(
         seed=payload.get("seed"),
         family=payload.get("family"),
         variant_index=payload.get("variant_index"),
+        multi_shift=payload.get("multi_shift", False),
     )
-    return simulator.as_observation(message).model_dump()
+    observation = session.as_observation()
+    observation.message = message or observation.message
+    return observation.model_dump()
 
 
 @app.post("/step")
 def step(action: ShiftLogAction):
-    tool = getattr(simulator, action.tool, None)
+    tool = getattr(session, action.tool, None)
     if tool is None or action.tool.startswith("_"):
-        return simulator.as_observation(f"Unknown tool: {action.tool}").model_dump()
+        observation = session.as_observation()
+        observation.message = f"Unknown tool: {action.tool}"
+        return observation.model_dump()
     message = tool(**action.arguments)
-    return simulator.as_observation(message).model_dump()
+    observation = session.as_observation()
+    observation.message = message
+    return observation.model_dump()
 
 
 @app.get("/state")
 def state():
-    return simulator.get_state().model_dump()
+    return session.get_info()
 
 
 @app.get("/tools")
@@ -58,4 +73,3 @@ def tools():
             "handoff_summary",
         ]
     }
-

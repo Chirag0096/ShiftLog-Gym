@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from .scenarios import FAMILIES
+from .scenarios import PUBLIC_FAMILIES
 from .simulator import ShiftLogSimulator
 
 
@@ -24,6 +24,7 @@ AVAILABLE_TOOLS = (
     "resolve_incident",
     "handoff_summary",
 )
+TRAINING_FAMILIES = PUBLIC_FAMILIES
 
 
 @dataclass(slots=True)
@@ -31,6 +32,7 @@ class EpisodeArtifacts:
     episode_row: dict[str, Any]
     memory_events: list[dict[str, Any]]
     tool_timeline: list[dict[str, Any]]
+    episode_replay: dict[str, Any]
 
 
 def build_variant_split() -> dict[str, tuple[int, ...]]:
@@ -107,6 +109,10 @@ def compute_unsupported_mitigation_rate(metrics: Any, total_incidents: int) -> f
     return metrics.fabricated_resolution_count / total_incidents
 
 
+def compute_noise_resistance_rate(simulator: ShiftLogSimulator) -> float:
+    return simulator.rubric_subscores().get("noise_resistance", 0.0)
+
+
 def summarize_episode(simulator: ShiftLogSimulator, episode_name: str, split: str, seed: int, variant_index: int) -> EpisodeArtifacts:
     state = simulator.get_state()
     memory_events = list(simulator.metrics.memory_events)
@@ -134,16 +140,31 @@ def summarize_episode(simulator: ShiftLogSimulator, episode_name: str, split: st
         "bad_write_rate": compute_bad_write_rate(memory_events),
         "unsupported_mitigation_rate": compute_unsupported_mitigation_rate(simulator.metrics, len(simulator.incidents)),
         "log_read_propensity": compute_log_read_propensity(tool_timeline, linked_total),
+        "noise_resistance_rate": compute_noise_resistance_rate(simulator),
         "memory_count": state.memory_count,
         "contradiction_count": state.contradiction_count,
         "linked_total": linked_total,
         "linked_success": simulator.metrics.linked_success,
         "unresolved_count": len(simulator.metrics.unresolved_incident_ids),
     }
+    replay = {
+        "episode_name": episode_name,
+        "split": split,
+        "seed": seed,
+        "variant_index": variant_index,
+        "shift_id": state.shift_id,
+        "tool_calls": _tool_calls_json(simulator),
+        "shift_log_entries": _shift_log_entries_json(simulator),
+        "resolutions": _resolutions_json(simulator),
+        "timeline_snapshots": _timeline_snapshots_json(simulator),
+        "retrieved_before_resolution": _retrieved_before_resolution(simulator),
+        "metrics": episode_row,
+    }
     return EpisodeArtifacts(
         episode_row=episode_row,
         memory_events=memory_events,
         tool_timeline=tool_timeline,
+        episode_replay=replay,
     )
 
 
@@ -192,7 +213,7 @@ def collect_policy_rollouts(
     memory_events: list[dict[str, Any]] = []
     tool_events: list[dict[str, Any]] = []
 
-    for family in FAMILIES:
+    for family in TRAINING_FAMILIES:
         for variant_index in variants:
             for seed in seeds:
                 simulator = ShiftLogSimulator()
@@ -272,3 +293,121 @@ def write_artifacts(
             writer = csv.DictWriter(handle, fieldnames=list(episodes[0].keys()))
             writer.writeheader()
             writer.writerows(episodes)
+
+
+def summarize_baseline(rows: list[dict[str, Any]]) -> dict[str, float]:
+    if not rows:
+        return {}
+    numeric_keys = [
+        "recall_before_action_rate",
+        "linked_incident_success_rate",
+        "noise_resistance_rate",
+        "weighted_reward",
+        "contradiction_rate",
+    ]
+    summary: dict[str, float] = {}
+    for key in numeric_keys:
+        summary_key = {
+            "weighted_reward": "avg_total_reward",
+            "contradiction_rate": "contradiction_rate",
+        }.get(key, key)
+        summary[summary_key] = sum(float(row.get(key, 0.0)) for row in rows) / len(rows)
+    return summary
+
+
+def write_episode_replays(output_dir: Path, episodes: list[EpisodeArtifacts]) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for artifact in episodes:
+        episode_name = artifact.episode_row["episode_name"]
+        with (output_dir / f"{episode_name}.json").open("w", encoding="utf-8") as handle:
+            json.dump(artifact.episode_replay, handle, indent=2)
+
+
+def _tool_calls_json(simulator: ShiftLogSimulator) -> list[dict[str, Any]]:
+    if simulator.episode_state is None:
+        return []
+    return [
+        {
+            "timestamp": call.timestamp,
+            "tool_name": call.tool_name,
+            "incident_id": call.incident_id,
+            "arguments": call.arguments,
+            "result": call.result,
+            "metadata": call.metadata,
+        }
+        for call in simulator.episode_state.tool_call_log
+    ]
+
+
+def _shift_log_entries_json(simulator: ShiftLogSimulator) -> list[dict[str, Any]]:
+    if simulator.episode_state is None:
+        return []
+    return [
+        {
+            "memory_id": entry.memory_id,
+            "timestamp": entry.timestamp,
+            "incident_id": entry.incident_id,
+            "entry_type": entry.entry_type,
+            "service": entry.service,
+            "fact": entry.fact,
+            "confidence": entry.confidence,
+            "contradiction": entry.contradiction,
+            "duplicate_of": entry.duplicate_of,
+            "fact_key": entry.fact_key,
+        }
+        for entry in simulator.episode_state.shift_log_entries
+    ]
+
+
+def _resolutions_json(simulator: ShiftLogSimulator) -> list[dict[str, Any]]:
+    if simulator.episode_state is None:
+        return []
+    return [
+        {
+            "incident_id": resolution.incident_id,
+            "root_cause": resolution.root_cause,
+            "mitigation": resolution.mitigation,
+            "resolved": resolution.resolved,
+            "is_noise": resolution.is_noise,
+        }
+        for resolution in simulator.episode_state.resolution_log.values()
+    ]
+
+
+def _timeline_snapshots_json(simulator: ShiftLogSimulator) -> list[dict[str, Any]]:
+    snapshots: list[dict[str, Any]] = []
+    if simulator.episode_state is None:
+        return snapshots
+    running_log: list[dict[str, Any]] = []
+    for call in simulator.episode_state.tool_call_log:
+        if call.tool_name == "append_shift_log":
+            incident_id = call.arguments.get("incident_id")
+            matching = next(
+                (
+                    entry
+                    for entry in simulator.episode_state.shift_log_entries
+                    if entry.incident_id == incident_id and entry.fact == call.arguments.get("fact")
+                ),
+                None,
+            )
+            if matching:
+                running_log.append(
+                    {
+                        "memory_id": matching.memory_id,
+                        "incident_id": matching.incident_id,
+                        "fact": matching.fact,
+                        "confidence": matching.confidence,
+                    }
+                )
+        snapshots.append({"timestamp": call.timestamp, "tool_name": call.tool_name, "shift_log_entries": list(running_log)})
+    return snapshots
+
+
+def _retrieved_before_resolution(simulator: ShiftLogSimulator) -> list[str]:
+    if simulator.episode_state is None:
+        return []
+    incident_ids: list[str] = []
+    for incident in simulator.incidents:
+        if simulator.episode_state.tool_was_called_before("read_shift_log", incident.incident_id, "resolve_incident"):
+            incident_ids.append(incident.incident_id)
+    return incident_ids

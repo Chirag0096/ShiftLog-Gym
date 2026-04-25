@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from shiftlog_gym.simulator import ShiftLogSimulator
+from shiftlog_gym.simulator import MultiShiftEpisode, ShiftLogSimulator
 
 
 class ShiftLogSimulatorTests(unittest.TestCase):
@@ -46,7 +46,12 @@ class ShiftLogSimulatorTests(unittest.TestCase):
         self.assertIn("No relevant shift-log entries", no_memory_message)
         self.assertTrue(linked.required_memory_keys)
 
+    def test_multi_shift_reset_contains_handoff_summary(self) -> None:
+        episode = MultiShiftEpisode()
+        observation = episode.reset(seed=2, family="db_pool")
+        self.assertIn("Shift", observation.handoff_summary)
+        self.assertIn("Handoff summary carried from prior shift", observation.message)
+
 
 if __name__ == "__main__":
     unittest.main()
-

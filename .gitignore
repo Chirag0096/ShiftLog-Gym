@@ -12,3 +12,13 @@ observatory/tool_timeline.jsonl
 observatory/eval_summary.csv
 observatory/plots/*.png
 artifacts/
+.env
+observatory/episodes/
+!observatory/episodes/.gitkeep
+observatory/training_runs/
+!observatory/training_runs/.gitkeep
+observatory/baselines.json
+observatory/baselines_random.json
+observatory/baselines_scripted.json
+observatory/baselines_llm_base.json
+observatory/baseline_comparison.png
