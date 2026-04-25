@@ -70,7 +70,9 @@ python -m unittest discover -s tests -v
 ```
 
 ### Training
-Training notebooks live in [train/01_env_smoke_test.ipynb](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/train/01_env_smoke_test.ipynb:1) and [train/02_grpo_train_colab.ipynb](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/train/02_grpo_train_colab.ipynb:1). The default model is `unsloth/Qwen2.5-3B-Instruct-bnb-4bit`, with `Qwen/Qwen2.5-1.5B-Instruct` as the fallback. The notebooks are structured for a free Colab T4 and budget roughly 1–2 hours for the scripted baselines plus the staged training pass.
+Training notebooks live in [train/01_env_smoke_test.ipynb](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/train/01_env_smoke_test.ipynb:1), [train/02_grpo_train_colab.ipynb](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/train/02_grpo_train_colab.ipynb:1), and [train/03_eval_publish_colab.ipynb](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/train/03_eval_publish_colab.ipynb:1). Notebook 2 now runs through `train/colab_training_pipeline.py`, prompts for both `HF_TOKEN` and `WANDB_API_KEY`, attempts GRPO first, and writes stage artifacts even if the runtime requires fallback. Notebook 3 runs through `train/colab_eval_publish.py` for plot/table/export generation.
+
+For Hugging Face hardware and budgeted execution flow, follow [docs/HF_SETUP_AND_GPU_PLAN.md](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/docs/HF_SETUP_AND_GPU_PLAN.md:1).
 
 ### Links
 - HuggingFace Space: [LINK](https://huggingface.co/spaces/PLACEHOLDER/shiftlog-gym)
