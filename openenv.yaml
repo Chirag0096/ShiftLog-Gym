@@ -1,0 +1,14 @@
+name: shiftlog_gym
+title: ShiftLog-Gym
+description: Professional-domain OpenEnv environment for memory-aware SRE incident response.
+version: 0.1.0
+entrypoint: shiftlog_gym.server.app:app
+tags:
+  - openenv
+  - reinforcement-learning
+  - memory
+  - sre
+  - incidents
+python_version: "3.11"
+license: mit
+

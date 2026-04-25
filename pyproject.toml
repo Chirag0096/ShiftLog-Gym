@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shiftlog-gym"
+version = "0.1.0"
+description = "Professional-domain OpenEnv environment for RL memory policies in SRE incident response."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Chirag Aswal" }
+]
+dependencies = [
+  "fastapi>=0.115.0",
+  "pydantic>=2.8.0",
+  "uvicorn>=0.30.0",
+]
+
+[project.optional-dependencies]
+openenv = [
+  "openenv-core[core]>=0.2.1",
+]
+observatory = [
+  "pandas>=2.2.0",
+  "plotly>=5.24.0",
+  "streamlit>=1.40.0",
+]
+train = [
+  "datasets>=3.0.0",
+  "matplotlib>=3.9.0",
+  "pandas>=2.2.0",
+  "peft>=0.14.0",
+  "transformers>=4.46.0",
+  "trl>=0.16.0",
+]
+
+[tool.setuptools]
+packages = ["shiftlog_gym", "shiftlog_gym.server"]
+

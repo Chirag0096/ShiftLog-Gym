@@ -1,0 +1,13 @@
+__pycache__/
+.DS_Store
+*.pyc
+.pytest_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+observatory/episodes.jsonl
+observatory/memory_events.jsonl
+observatory/eval_summary.csv
+observatory/plots/*.png
+
