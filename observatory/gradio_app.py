@@ -183,7 +183,7 @@ def get_training_status():
     return training_status_msg
 
 # Initialize Interface structure
-with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css, theme=gr.themes.Slate()) as demo:
+with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
     
     # Header Module
     with gr.Column(elem_classes="glass-header"):
