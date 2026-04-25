@@ -1,18 +1,77 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
 from pathlib import Path
 
 import gradio as gr
 import pandas as pd
 import plotly.express as px
 
-
+# Directory structure resolution
 ROOT = Path(__file__).resolve().parent.parent
 OBS_ROOT = ROOT / "observatory"
 RUNS_DIR = OBS_ROOT / "training_runs"
 BASELINES_FILE = OBS_ROOT / "baselines.json"
 
+custom_css = """
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+body, .gradio-container { 
+    font-family: 'Inter', sans-serif !important; 
+    background-color: #0b0f19 !important; 
+    color: #e2e8f0 !important; 
+}
+.glass-panel {
+    background: rgba(17, 24, 39, 0.7) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
+    padding: 24px !important;
+}
+.glass-header {
+    background: linear-gradient(135deg, #1e293b, #0f172a) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 16px 16px 0 0 !important;
+    padding: 20px !important;
+    margin-bottom: 20px !important;
+}
+.title-gradient {
+    background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800 !important;
+    font-size: 2.5rem !important;
+    text-align: center;
+    margin: 0 !important;
+}
+.subtitle {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 1.1rem;
+    margin-top: 8px;
+}
+.btn-primary {
+    background: linear-gradient(90deg, #6366f1, #8b5cf6) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4) !important;
+}
+.btn-primary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6) !important;
+}
+.plot-container {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.st-tabs { border-bottom: 1px solid rgba(255,255,255,0.1) !important; }
+"""
 
 def _load_curve(stage: str) -> pd.DataFrame:
     path = RUNS_DIR / f"training_curves_{stage}.csv"
@@ -20,61 +79,170 @@ def _load_curve(stage: str) -> pd.DataFrame:
         return pd.DataFrame()
     return pd.read_csv(path)
 
-
 def plot_training(stage: str):
     frame = _load_curve(stage)
     if frame.empty:
         return px.line(title=f"No curve file found for {stage}")
+        
     metric_columns = [col for col in ["reward_total", "reward_recall", "reward_success", "reward_memory_write", "recall_before_action_rate"] if col in frame.columns]
     melted = frame.melt(id_vars=["step"], value_vars=metric_columns, var_name="metric", value_name="value")
-    figure = px.line(melted, x="step", y="value", color="metric", title=f"ShiftLog-Gym Training Curves ({stage})")
-    figure.add_hline(y=0.5, line_dash="dash", annotation_text="Human baseline estimate")
+    
+    figure = px.line(melted, x="step", y="value", color="metric", title=f"ShiftLog-Gym Policy Metrics - {stage.upper()}")
+    
+    figure.update_layout(
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font_color='#e2e8f0',
+        title_font_family='Inter',
+        title_font_size=20,
+        title_x=0.5,
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    figure.update_xaxes(showgrid=True, gridwidth=1, gridcolor='rgba(255,255,255,0.05)')
+    figure.update_yaxes(showgrid=True, gridwidth=1, gridcolor='rgba(255,255,255,0.05)')
+    figure.add_hline(y=0.5, line_dash="dash", line_color="rgba(255,255,255,0.2)", annotation_text="Baseline Expected Ratio")
+    
     return figure
-
 
 def load_baseline_table():
     if not BASELINES_FILE.exists():
-        return pd.DataFrame([{"status": "No baselines.json found"}])
+        return pd.DataFrame([{"status": "No baselines.json found, please run evaluation notebook first"}])
     payload = json.loads(BASELINES_FILE.read_text(encoding="utf-8"))
+    
     rows = [
-        {"agent": "Random Agent", **payload.get("random", {})},
-        {"agent": "Scripted Agent", **payload.get("scripted", {})},
-        {"agent": "Untrained LLM", **payload.get("llm_base", {})},
-        {"agent": "Trained LLM", **payload.get("trained_llm", {})},
+        {"Model Agent": "Random Agent Baseline", **payload.get("random", {})},
+        {"Model Agent": "Scripted Policy (SRE Expert)", **payload.get("scripted", {})},
+        {"Model Agent": "Untrained General LLM", **payload.get("llm_base", {})},
+        {"Model Agent": "Trained ShiftLog Policy", **payload.get("trained_llm", {})},
     ]
     return pd.DataFrame(rows)
-
 
 def load_eval_table(stage: str):
     path = RUNS_DIR / f"eval_summary_{stage}.csv"
     if not path.exists():
-        return pd.DataFrame([{"status": f"No eval_summary_{stage}.csv found"}])
+        return pd.DataFrame([{"status": f"No evaluation summary found for {stage}"}])
     return pd.read_csv(path)
 
+# ----------------- Automated Training Execution Logic -----------------
+training_status_msg = "Not Started. Awaiting execution."
 
-with gr.Blocks(title="ShiftLog Observatory (Gradio)") as demo:
-    gr.Markdown("# ShiftLog Observatory")
-    gr.Markdown(
-        "Visualize training curves, baseline comparison, and held-out evaluation tables for ShiftLog-Gym."
-    )
+def start_training_pipeline_background(hf_repo: str):
+    global training_status_msg
+    try:
+        training_status_msg = "Initializing..."
+        import sys
+        sys.path.append(str(ROOT))
+        
+        # Check GPU availability which pipeline demands
+        import torch
+        if not torch.cuda.is_available():
+            training_status_msg = "ERROR: No CUDA GPU available. Go to Space Settings -> Hardware and select Nvidia T4 or L4."
+            return
 
-    with gr.Tab("Training Curves"):
-        stage_choice = gr.Dropdown(choices=["stageA", "stageB", "stageC"], value="stageC", label="Stage")
-        curve_plot = gr.Plot(label="Training Curves")
-        curve_button = gr.Button("Load Curves")
-        curve_button.click(fn=plot_training, inputs=[stage_choice], outputs=[curve_plot])
+        from train.colab_training_pipeline import ColabTrainingPipeline
 
-    with gr.Tab("Baseline Comparison"):
-        baseline_table = gr.Dataframe(label="Baselines")
-        baseline_button = gr.Button("Load Baselines")
-        baseline_button.click(fn=load_baseline_table, inputs=None, outputs=[baseline_table])
+        training_status_msg = "Loading ColabTrainingPipeline & Authenticating..."
+        pipeline = ColabTrainingPipeline()
+        pipeline.authenticate()
 
-    with gr.Tab("Held-out Evaluation"):
-        eval_stage_choice = gr.Dropdown(choices=["stageA", "stageB", "stageC"], value="stageC", label="Stage")
-        eval_table = gr.Dataframe(label="Evaluation Summary")
-        eval_button = gr.Button("Load Eval Table")
-        eval_button.click(fn=load_eval_table, inputs=[eval_stage_choice], outputs=[eval_table])
+        training_status_msg = "Loading Qwen Model into memory (4-bit)..."
+        pipeline.load_model()
 
+        training_status_msg = "Running Stage A (SFT Initial Policy)..."
+        pipeline.run_stage_a()
+
+        training_status_msg = "Running Stage B (GRPO Short Rollout)..."
+        pipeline.run_stage_grpo(pipeline.stage_b)
+
+        training_status_msg = "Running Stage C (GRPO Full Rollout)..."
+        pipeline.run_stage_grpo(pipeline.stage_c)
+
+        training_status_msg = "Evaluating & Summarizing Results..."
+        pipeline.evaluate_and_write()
+
+        if hf_repo:
+            training_status_msg = f"Uploading weights to HF Model Hub at {hf_repo}..."
+            pipeline.upload_to_hf(repo_id=hf_repo)
+
+        training_status_msg = "Done! Training successfully completed!"
+    except Exception as e:
+        training_status_msg = f"ERROR: {str(e)}"
+
+def trigger_training(hf_repo):
+    global training_status_msg
+    if "Running" in training_status_msg or "Loading" in training_status_msg:
+        return training_status_msg
+    
+    t = threading.Thread(target=start_training_pipeline_background, args=(hf_repo,))
+    t.start()
+    return "Training job submitted to background daemon. Refresh status to view updates."
+
+def get_training_status():
+    global training_status_msg
+    return training_status_msg
+
+# Initialize Interface structure
+with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css, theme=gr.themes.Slate()) as demo:
+    
+    # Header Module
+    with gr.Column(elem_classes="glass-header"):
+        gr.Markdown("<h1 class='title-gradient'>ShiftLog-Gym Observatory</h1>")
+        gr.Markdown("<div class='subtitle'>State-of-the-art RL visualization for SRE Incident Memory Policies</div>")
+
+    # Interactive Tabs
+    with gr.Tabs(elem_classes="st-tabs"):
+        
+        with gr.Tab("📈 Training Progression"):
+            with gr.Column(elem_classes="glass-panel"):
+                gr.Markdown("### Real-time Policy Optimization Metrics")
+                gr.Markdown("Visualize how the LLM agent learns causal resolution patterns across the defined PEFT/GRPO training regimes.")
+                with gr.Row():
+                    stage_choice = gr.Dropdown(choices=["stageA", "stageB", "stageC"], value="stageC", label="Select Training Phase", scale=1)
+                    curve_button = gr.Button("🚀 Render Dashboard Plot", elem_classes="btn-primary", scale=1)
+                
+                with gr.Column(elem_classes="plot-container"):
+                    curve_plot = gr.Plot(label="")
+                
+                curve_button.click(fn=plot_training, inputs=[stage_choice], outputs=[curve_plot])
+                demo.load(fn=plot_training, inputs=[stage_choice], outputs=[curve_plot])
+
+        with gr.Tab("🏆 Baselines & Leaderboard"):
+            with gr.Column(elem_classes="glass-panel"):
+                gr.Markdown("### Agent Head-to-Head Comparison")
+                gr.Markdown("Compare the trained Checkpoint against baseline agents ensuring statistical confidence in the RL environment.")
+                baseline_button = gr.Button("🔄 Refresh Leaderboard", elem_classes="btn-primary")
+                baseline_table = gr.Dataframe(label="")
+                
+                baseline_button.click(fn=load_baseline_table, inputs=None, outputs=[baseline_table])
+                demo.load(fn=load_baseline_table, inputs=None, outputs=[baseline_table])
+
+        with gr.Tab("🔬 Held-out Evaluation"):
+            with gr.Column(elem_classes="glass-panel"):
+                gr.Markdown("### Validation Cohort Summary")
+                gr.Markdown("Performance on unseen, noise-injected incident topologies to verify true causal memory integration.")
+                with gr.Row():
+                    eval_stage_choice = gr.Dropdown(choices=["stageA", "stageB", "stageC"], value="stageC", label="Select Evaluation Checkpoint")
+                    eval_button = gr.Button("📊 Load Evaluation Bundle", elem_classes="btn-primary")
+                eval_table = gr.Dataframe(label="")
+                
+                eval_button.click(fn=load_eval_table, inputs=[eval_stage_choice], outputs=[eval_table])
+                demo.load(fn=load_eval_table, inputs=[eval_stage_choice], outputs=[eval_table])
+
+        with gr.Tab("⚙️ Engine & Execute Training"):
+            with gr.Column(elem_classes="glass-panel"):
+                gr.Markdown("### Start HF Space GPU Training Job")
+                gr.Markdown("Click to begin the RL LoRA training pipeline on the current space's hardware. **Make sure your space is configured with an L4 or T4 GPU before clicking this, otherwise it will fail.**")
+                
+                hf_upload_repo = gr.Textbox(label="HF Model Repository (Optional)", placeholder="Chirag0123/shiftlog-gym-qwen-memory-policy", value="Chirag0123/shiftlog-gym-qwen-memory-policy")
+                
+                status_block = gr.Textbox(label="Training Daemon Status", value=training_status_msg, interactive=False)
+                
+                start_btn = gr.Button("🔥 Run Full PEFT/GRPO Train Pipeline", elem_classes="btn-primary")
+                refresh_btn = gr.Button("🔄 Check Status")
+                
+                start_btn.click(fn=trigger_training, inputs=[hf_upload_repo], outputs=[status_block])
+                refresh_btn.click(fn=get_training_status, inputs=[], outputs=[status_block])
 
 if __name__ == "__main__":
     demo.launch()
