@@ -8,6 +8,7 @@ build/
 *.egg-info/
 observatory/episodes.jsonl
 observatory/memory_events.jsonl
+observatory/tool_timeline.jsonl
 observatory/eval_summary.csv
 observatory/plots/*.png
-
+artifacts/

@@ -70,14 +70,18 @@ class ShiftLogSimulator:
         self.total_reward += delta
 
     def _record_tool(self, tool: str, detail: dict[str, Any] | None = None) -> None:
-        incident_id = self.active_incident.incident_id if self.active_incident else None
+        incident = self.active_incident
+        incident_id = incident.incident_id if incident else None
         self.metrics.tool_timeline.append(
             {
                 "shift_id": self.shift_id,
                 "incident_id": incident_id,
                 "step_index": len(self.metrics.tool_timeline),
                 "tool": tool,
-                "detail": detail or {},
+                "detail": {
+                    **(detail or {}),
+                    "linked_incident": bool(incident.linked_to) if incident else False,
+                },
             }
         )
         self._record_reward("R_efficiency", -0.02)

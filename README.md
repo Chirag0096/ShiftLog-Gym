@@ -147,12 +147,19 @@ Use the notebooks in `train/`:
 - `01_env_smoke_test.ipynb`
   - random baseline
   - scripted baseline
-  - artifact export and sanity plots
+  - optional prompted-base baseline
+  - artifact export and first-pass memory metrics
 - `02_grpo_train_colab.ipynb`
-  - `Qwen2.5-3B-Instruct` default
+  - `unsloth/Qwen2.5-3B-Instruct-bnb-4bit` default
   - `Qwen2.5-1.5B-Instruct` fallback
-  - LoRA / QLoRA friendly setup
-  - TRL `environment_factory` via `shiftlog_gym.trl_env.ShiftLogToolEnv`
+  - optional Stage A bootstrap SFT
+  - Stage B short-rollout GRPO
+  - Stage C full current-env GRPO
+  - W&B free tracking and local artifact export
+- `03_eval_publish_colab.ipynb`
+  - base vs trained adapter comparison on held-out variants
+  - plot generation for README/blog/model card
+  - Hugging Face upload flow for adapters and eval artifacts
 
 ## Submission Checklist
 
@@ -178,4 +185,3 @@ This repo includes:
 - unit tests for schema integrity, contradictions, causal reward attribution, and memory dependence
 
 It is intentionally single-agent and optimized for a 48-hour hackathon submission.
-

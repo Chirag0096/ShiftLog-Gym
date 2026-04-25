@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .client import ShiftLogEnv
 from .models import ShiftLogAction
+from .training import weighted_reward_from_breakdown
 
 
 class ShiftLogToolEnv:
@@ -159,14 +160,36 @@ class ShiftLogToolEnv:
         """
         return self._call("handoff_summary")
 
+    def _reward_breakdown(self) -> dict[str, float]:
+        return self.client.state().reward_breakdown
+
+    def _weighted_reward(self) -> float:
+        return weighted_reward_from_breakdown(self._reward_breakdown())
+
 
 def reward_total(environments, **kwargs):
-    return [env.reward for env in environments]
+    return [env._weighted_reward() for env in environments]
 
 
 def reward_recall(environments, **kwargs):
-    rewards = []
-    for env in environments:
-        rewards.append(env.client.state().reward_breakdown.get("R_recall", 0.0))
-    return rewards
+    return [0.35 * env._reward_breakdown().get("R_recall", 0.0) for env in environments]
 
+
+def reward_success(environments, **kwargs):
+    return [env._reward_breakdown().get("R_success", 0.0) for env in environments]
+
+
+def reward_memory_write(environments, **kwargs):
+    return [0.15 * env._reward_breakdown().get("R_memory_write", 0.0) for env in environments]
+
+
+def reward_memory_integrity(environments, **kwargs):
+    return [env._reward_breakdown().get("R_memory_integrity", 0.0) for env in environments]
+
+
+def reward_efficiency(environments, **kwargs):
+    return [0.1 * env._reward_breakdown().get("R_efficiency", 0.0) for env in environments]
+
+
+def reward_hallucination(environments, **kwargs):
+    return [env._reward_breakdown().get("R_hallucination", 0.0) for env in environments]
