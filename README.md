@@ -1,3 +1,14 @@
+---
+title: Shiftlog-Gym
+emoji: 🚀
+colorFrom: indigo
+colorTo: blue
+sdk: gradio
+sdk_version: 5.0.0
+app_file: app.py
+pinned: false
+license: mit
+---
 ## ShiftLog-Gym
 
 **The first RL training environment where causal incident dependency chains require cross-episode memory retrieval for correct resolution — operationalizing institutional SRE knowledge as a learnable memory policy.**
