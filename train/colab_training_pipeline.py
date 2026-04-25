@@ -95,8 +95,8 @@ class ColabTrainingPipeline:
             )
 
     def load_model(self, model_name: str = "Qwen/Qwen2.5-1.5B-Instruct") -> None:
-        request_bf16 = os.environ.get("SHIFTLOG_USE_BF16", "0") == "1"
-        self.use_bf16 = request_bf16 and bool(torch.cuda.is_bf16_supported())
+        # FORCE bf16 automatically to avoid GradScaler fp16 crashes with natively bfloat16 models
+        self.use_bf16 = bool(torch.cuda.is_bf16_supported())
         self.use_fp16 = not self.use_bf16
 
         compute_dtype = torch.bfloat16 if self.use_bf16 else torch.float16
