@@ -412,9 +412,16 @@ class ScenarioFactory:
         )
 
 
-SCENARIO_REGISTRY: dict[str, ScenarioFactory] = {
-    family: ScenarioFactory(default_family=family) for family in PUBLIC_FAMILIES
-}
+SCENARIO_REGISTRY: dict[str, ScenarioFactory] | None = None
+
+def get_scenario_registry() -> dict[str, ScenarioFactory]:
+    """Lazy-load the scenario registry on first use."""
+    global SCENARIO_REGISTRY
+    if SCENARIO_REGISTRY is None:
+        SCENARIO_REGISTRY = {
+            family: ScenarioFactory(default_family=family) for family in PUBLIC_FAMILIES
+        }
+    return SCENARIO_REGISTRY
 
 FAMILIES = PUBLIC_FAMILIES + tuple(FAMILY_ALIASES.keys())
 

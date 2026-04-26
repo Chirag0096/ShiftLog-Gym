@@ -414,4 +414,3 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
   })();
 </script>'''
     gr.HTML(diag_html)
-    demo.launch(css=custom_css)
