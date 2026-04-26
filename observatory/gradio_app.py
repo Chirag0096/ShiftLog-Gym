@@ -302,8 +302,6 @@ border-radius:12px;padding:20px;margin-bottom:12px">
 the previous shift — but only if the agent <strong style="color:#38bdf8">reads the shift log first.</strong></p>
 </div>""")
                     status_label = gr.Markdown(value=system_status_md)
-                    t1_timer = gr.Timer(value=30)
-                    t1_timer.tick(fn=system_status_md, outputs=[status_label])
                     demo_btn = gr.Button("▶  Start Demo Episode", variant="primary")
                     next_btn = gr.Button("⏭  Next Step (1/5)", interactive=False)
                     step_state = gr.State(0)
@@ -360,7 +358,6 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
         with gr.Tab("🏥 System Health"):
             health_hdr = gr.Markdown("_Click **Run Health Check** to get current status_")
             hc_btn = gr.Button("🔄 Run Health Check Now", variant="primary")
-            t5_timer = gr.Timer(value=60)
             with gr.Accordion("API Health", open=True):
                 api_md   = gr.Markdown()
             with gr.Accordion("Environment Validation", open=False):
@@ -376,8 +373,6 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
 
             hc_btn.click(fn=run_health_check_ui,
                          outputs=[health_hdr, api_md, scen_md, art_md])
-            t5_timer.tick(fn=run_health_check_ui,
-                          outputs=[health_hdr, api_md, scen_md, art_md])
 
 if __name__ == "__main__":
     demo.launch(css=custom_css)
