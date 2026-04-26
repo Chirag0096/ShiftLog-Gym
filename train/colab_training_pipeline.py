@@ -98,11 +98,13 @@ class ColabTrainingPipeline:
             )
 
     def load_model(self, model_name: str = "Qwen/Qwen2.5-1.5B-Instruct") -> None:
-        # Enforce fp16 universally. bfloat16 AMP scaling crashes native PyTorch 2.x GradScaler on 4-bit PEFT
-        self.use_bf16 = False
-        self.use_fp16 = True
+        # Qwen2.5 is a native BFloat16 model. Using fp16+GradScaler with bf16 tensors
+        # causes: "_amp_foreach_non_finite_check_and_unscale_cuda not implemented for BFloat16".
+        # Fix: use bf16=True (no GradScaler needed), fp16=False.
+        self.use_bf16 = True
+        self.use_fp16 = False
 
-        compute_dtype = torch.float16
+        compute_dtype = torch.bfloat16
         bnb_cfg = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",

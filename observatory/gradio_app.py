@@ -190,10 +190,13 @@ def trigger_training(hf_repo):
     import subprocess
     import sys
     import os
-    status = get_training_status()
-    if any(kw in status for kw in ["Running", "Loading", "Evaluating", "Uploading", "Initializing", "Preparing"]):
-        return status
+    raw_status = STATUS_FILE.read_text(encoding="utf-8").strip() if STATUS_FILE.exists() else ""
+    # Strip timestamp prefix [HH:MM:SS] before checking keywords
+    bare_status = raw_status.split("] ", 1)[-1] if raw_status.startswith("[") else raw_status
+    if any(kw in bare_status for kw in ["Running", "Loading", "Evaluating", "Uploading", "Initializing", "Preparing", "Stage", "Authenticating", "Generating"]):
+        return f"⚠️ Training already running: {bare_status}"
     
+    STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
     STATUS_FILE.write_text("Preparing decoupled training subprocess...", encoding="utf-8")
     
     # Throttle PyTorch CPU usage so the FastApi Uvicorn server doesn't get starved!
