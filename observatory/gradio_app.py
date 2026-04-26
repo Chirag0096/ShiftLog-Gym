@@ -328,14 +328,11 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
    style="color:#818cf8;text-decoration:none;font-weight:600">📊 View WandB Run →</a></div>''')
             gr.Markdown("---\n### Training Plots")
             img1 = gr.Image(value=load_plot("01_reward_curve.png"),
-                            label="📈 Reward Curve — total reward over training steps",
-                            type="filepath")
+                            label="📈 Reward Curve — total reward over training steps")
             img2 = gr.Image(value=load_plot("02_recall_bonus_curve.png"),
-                            label="🧠 R2 Recall Bonus — memory policy learning curve",
-                            type="filepath")
+                            label="🧠 R2 Recall Bonus — memory policy learning curve")
             img3 = gr.Image(value=load_plot("03_mttr_comparison.png"),
-                            label="⏱ MTTR: Before vs After Training on Linked Incidents",
-                            type="filepath")
+                            label="⏱ MTTR: Before vs After Training on Linked Incidents")
             ref_btn = gr.Button("🔄 Refresh Results")
             ref_btn.click(fn=refresh_results, outputs=[t2_banner, t2_cards, img1, img2, img3])
 
@@ -379,4 +376,4 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                          outputs=[health_hdr, api_md, scen_md, art_md])
 
 if __name__ == "__main__":
-    demo.launch(css=custom_css)
+    demo.launch()
