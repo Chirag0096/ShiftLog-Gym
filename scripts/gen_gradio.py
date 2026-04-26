@@ -25,6 +25,10 @@ body,.gradio-container{font-family:'Inter',sans-serif!important;background:#0b0f
 .title{background:linear-gradient(90deg,#38bdf8,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:800!important;font-size:2.2rem!important;text-align:center}
 .btn-main{background:linear-gradient(90deg,#6366f1,#8b5cf6)!important;border:none!important;color:#fff!important;font-weight:600!important;transition:.25s!important}
 .badge-ok{color:#4ade80;font-weight:700}.badge-warn{color:#facc15;font-weight:700}.badge-err{color:#f87171;font-weight:700}
+/* Keep tab navigation above content overlays in Gradio 5/6 mounted mode */
+.gradio-container [role="tablist"]{position:relative;z-index:50;pointer-events:auto!important}
+.gradio-container [role="tab"]{pointer-events:auto!important}
+.gradio-container [role="tabpanel"]{position:relative;z-index:1}
 """
 
 TOOL_EXAMPLES = {
@@ -295,7 +299,7 @@ def health_log_md():
 
 # ── Build UI ──────────────────────────────────────────────────────────────────
 
-with gr.Blocks(title="ShiftLog-Gym Observatory") as demo:
+with gr.Blocks(title="ShiftLog-Gym Observatory", css=custom_css) as demo:
     gr.HTML("""<div style='text-align:center;padding:28px 0 8px'>
 <h1 style='background:linear-gradient(90deg,#38bdf8,#818cf8,#c084fc);
 -webkit-background-clip:text;-webkit-text-fill-color:transparent;
@@ -404,6 +408,6 @@ but only if the agent <strong style='color:#38bdf8'>reads the shift log first</s
                           outputs=[health_header, api_detail, scen_detail, art_detail, log_detail])
 
 if __name__ == "__main__":
-    demo.launch(css=custom_css)
+    demo.launch()
 ''', encoding="utf-8")
 print(f"Written: {OUT}")

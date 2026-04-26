@@ -34,6 +34,10 @@ body,.gradio-container{font-family:"Inter",sans-serif!important;background:#0b0f
 .glass{background:rgba(17,24,39,.75)!important;backdrop-filter:blur(12px)!important;
   border:1px solid rgba(255,255,255,.08)!important;border-radius:16px!important;padding:24px!important}
 .btn-main{background:linear-gradient(90deg,#6366f1,#8b5cf6)!important;color:#fff!important;font-weight:600!important}
+/* Keep tab navigation above content overlays in Gradio 5/6 mounted mode */
+.gradio-container [role="tablist"]{position:relative;z-index:50;pointer-events:auto!important}
+.gradio-container [role="tab"]{pointer-events:auto!important}
+.gradio-container [role="tabpanel"]{position:relative;z-index:1}
 """
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -280,7 +284,7 @@ def run_health_check_ui():
 
 # ── Build Blocks ──────────────────────────────────────────────────────────────
 
-with gr.Blocks(title="ShiftLog-Gym Observatory") as demo:
+with gr.Blocks(title="ShiftLog-Gym Observatory", css=custom_css) as demo:
 
     gr.HTML("""<div style="text-align:center;padding:28px 0 8px">
 <h1 style="background:linear-gradient(90deg,#38bdf8,#818cf8,#c084fc);
@@ -375,4 +379,4 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                          outputs=[health_hdr, api_md, scen_md, art_md])
 
 if __name__ == "__main__":
-    demo.launch(css=custom_css)
+    demo.launch()
