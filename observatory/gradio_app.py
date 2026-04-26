@@ -308,7 +308,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                     incident_info = gr.Markdown("_Click **Start Demo Episode** to begin_")
 
                 with gr.Column(scale=6):
-                    chatbot = gr.Chatbot(label="Agent Action Log", height=440, bubble_full_width=False)
+                    chatbot = gr.Chatbot(label="Agent Action Log", height=440)
 
             demo_btn.click(fn=start_demo, outputs=[chatbot, incident_info]).then(
                 fn=lambda: gr.update(interactive=True), outputs=[next_btn])
