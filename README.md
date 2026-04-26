@@ -32,9 +32,20 @@ license: mit
 
 Every frontier AI lab has built a memory feature. **None of them trained the underlying model to use it.**
 
-When GPT-4 or Claude 3.5 face an 8-hour shift horizon, their context accuracy collapses as logs pile up. GPT-4's accuracy falls from **99% to 70%** as context fills. Claude 3.5 Sonnet drops from **88% to 30%**. The "lost-in-the-middle" phenomenon causes accuracy on middle-context information to drop to **76–82%** compared to **85–95%** at the start and end. 
+When GPT-4 or Claude 3.5 face an 8-hour shift horizon, their context accuracy collapses as logs pile up. GPT-4's accuracy falls from **99% to 70%** as context fills. Claude 3.5 Sonnet drops from **88% to 30%**. The "lost-in-the-middle" phenomenon causes accuracy on middle-context information to drop to **76–82%** compared to **85–95%** at the start and end.
 
-**ShiftLog-Gym is the first domain-specific professional RL environment for memory management**, with causal incident dependencies and verifiable outcome rewards (MTTR).
+The deeper failure: every memory solution — ChatGPT Memory, Claude Projects, Gemini Personal Context — is a **retrieval system bolted on top**. The model was never trained to decide **what** to write, **when** to retrieve, and **what** to discard.
+
+### State of the Art Comparison
+
+| Capability | GPT-5 | Claude Opus 4 | Gemini 3 | **ShiftLog-Gym (Trained)** |
+|---|:---:|:---:|:---:|:---:|
+| Large context window | ✅ | ✅ | ✅ | — |
+| Cross-session memory feature | ✅ | ✅ | ✅ | ✅ |
+| Trained to decide **what** to write | ❌ | ❌ | ❌ | **✅** |
+| Trained to decide **when** to retrieve | ❌ | ❌ | ❌ | **✅** |
+| Trained to decide **what** to forget | ❌ | ❌ | ❌ | **✅** |
+| Cross-episode causal memory use | ❌ | ❌ | ❌ | **✅** |
 
 ---
 
@@ -44,56 +55,60 @@ ShiftLog-Gym simulates a complete **8-hour SRE on-call shift** across 12 sequent
 
 ![Architecture Flow](plots/architecture_flow.jpg)
 
+### The 12-Incident Scenario Bank
+
+| # | Service | Failure Type | Causal Role |
+|---|---|---|---|
+| 1 | Payment DB | Connection pool near-exhaustion | **Seeds #7 and #10** |
+| 2 | API Gateway | Rate limiter misconfiguration (429 storms) | Independent |
+| 3 | Notification Svc | OOMKilled pod | **Seeds #9** |
+| 4 | Inventory Svc | Slow upstream DB query | Independent |
+| 5 | Order Svc | Config drift post-deployment | **Seeds #11** |
+| 6 | User Auth | Certificate near-expiry warning (proactive) | Independent |
+| 7 | Auth Service | Cascade failure — DB pool exhausted | **← Caused by #1** |
+| 8 | Search Svc | Index corruption (long diagnostic chain) | Independent |
+| 9 | Notification Svc | OOM recurrence — same pod limits | **← Caused by #3** |
+| 10 | Payment DB v2 | Second pool event, different instance | **← Related to #1** |
+| 11 | Order Svc v2 | Same config key drift, different value | **← Caused by #5** |
+| 12 | Shift Close | Agent writes handoff note for next engineer | Synthesis |
+
 ---
 
 ## 🧪 Deep Research & Mathematical Framework
 
 ### 1. The Optimization Objective: GRPO
-ShiftLog-Gym utilizes **Group Relative Policy Optimization (GRPO)**, a reinforcement learning algorithm that eliminates the need for a separate critic model by computing advantages relative to a group of sampled trajectories.
+ShiftLog-Gym utilizes **Group Relative Policy Optimization (GRPO)**, eliminating the need for a separate critic model by computing advantages relative to a group of sampled trajectories.
 
-For a group of $G$ outputs $\{o_1, o_2, \dots, o_G\}$, the advantage $\hat{A}_i$ for output $o_i$ is calculated as:
+For a group of $G$ outputs $\{o_1, o_2, \dots, o_G\}$, the advantage $\hat{A}_i$ is:
 $$\hat{A}_i = \frac{R_i - \text{mean}(R_1, \dots, R_G)}{\text{std}(R_1, \dots, R_G)}$$
 
-The GRPO loss function minimized during training is:
+The GRPO loss minimized during training is:
 $$L_{GRPO}(\theta) = -\frac{1}{G} \sum_{i=1}^{G} \min \left( \frac{\pi_\theta(o_i|q)}{\pi_{\theta_{old}}(o_i|q)} \hat{A}_i, \text{clip} \left( \frac{\pi_\theta(o_i|q)}{\pi_{\theta_{old}}(o_i|q)}, 1-\epsilon, 1+\epsilon \right) \hat{A}_i \right) + \beta D_{KL}(\pi_\theta || \pi_{ref})$$
-
-This approach is specifically effective for **memory operations** because it allows the model to compare different memory-writing strategies (e.g., "concise" vs. "causal") within the same incident context and amplify those that lead to lower MTTR in future steps.
 
 ### 2. Multi-Stage Training Pipeline
 We implement a 3-stage curriculum to transition the model from base instruction-following to specialized causal memory management:
 
 | Stage | Name | Objective | Duration |
 | :--- | :--- | :--- | :--- |
-| **Stage A** | **SFT Warmup** | Align model to the `ShiftLogEntry` JSON schema and tool-calling syntax. | 50 Steps |
+| **Stage A** | **SFT Warmup** | Align model to JSON schema and tool-calling syntax (50 hand-authored examples). | 50 Steps |
 | **Stage B** | **GRPO Short** | Optimize for "Recall-before-action" (R2) in 4-incident horizons. | 200 Steps |
 | **Stage C** | **GRPO Full** | Full 8-hour shift optimization (12 incidents) with causal dependency rewards. | 300 Steps |
 
 ### 3. Causal Reward Rubric (PRM)
-The **Process Reward Model (PRM)** decomposes the 8-hour shift into 8 independent, programmatically verifiable signals. The total reward $R_{total}$ for an episode is:
-$$R_{total} = \sum_{j=1}^{8} w_j \cdot R_j$$
-
-Where the primary causal signal **R2 (Recall Before Action)** is defined as:
+The **Process Reward Model (PRM)** decomposes the shift into 8 independent, programmatically verifiable signals. The primary causal signal **R2 (Recall Before Action)** is:
 $$R_2 = \frac{1}{|I_{linked}|} \sum_{i \in I_{linked}} \mathbb{1}(\text{tool\_called}(\text{read\_shift\_log}, i) \prec \text{tool\_called}(\text{mitigate}, i))$$
-This formula ensures the model is *only* rewarded for recall if it happens *before* a mitigation attempt, effectively penalizing "trial-and-error" behavior.
+
+#### Anti-Reward-Hacking Design
+| Hacking Attempt | Countermeasure |
+|---|---|
+| Write everything to the log | Log capped at 2,000 tokens. New writes fail when full — agent must summarize. |
+| Never discard anything | Full log means current incident context cannot fit. Retrieval precision degrades. |
+| Escalate every incident | Each unnecessary escalation carries a significant −0.3 penalty. |
+| Resolve without using memory | Brute-force takes 25 steps; memory-recall takes 3. MTTR gap dominates reward. |
 
 ---
 
-## 🏆 Reward Architecture Details
-
-| Signal | Weight | Logic / Formula |
-|---|---:|---|
-| **R1 — Success** | **0.35** | $CorrectResolutions / TotalRealIncidents$ |
-| **R2 — Recall** | **0.25** | Causal check: `read\_log` happened before `mitigate` on linked incidents. |
-| **R3 — Quality** | **0.15** | Keyword overlap between `fact` and scenario `ground\_truth`. |
-| **R4 — Integrity** | **0.10** | Penalty for duplicate or contradictory log entries. |
-| **R5 — Efficiency** | **0.05** | $1.0 - (TotalToolCalls / MaxAllowedCalls)$ |
-| **R6 — Hallucination**| **0.05** | Penalty for mitigations not supported by diagnostic evidence. |
-| **R7 — Noise Res.** | **0.03** | Penalty for retrieving memory on independent (noise) incidents. |
-| **R8 — Handoff** | **0.02** | Qualitative check on final `handoff\_summary` accuracy. |
-
----
-
-## 📈 Training Results & Evaluation
+## 📈 Training Results & Performance
 
 ### Training Curves (Qwen2.5-3B)
 
@@ -114,6 +129,14 @@ This formula ensures the model is *only* rewarded for recall if it happens *befo
 
 ---
 
+## 🛠 What the Model Learns
+
+1. **Proactive Logging**: The model learns to write shift log entries for unusual system state changes that carry downstream risk, not just trivial fixes.
+2. **Selective Recall**: The model learns to call `read_shift_log` *before* running diagnostics when service topology suggests a potential causal link.
+3. **Memory Hygiene**: Under a 2,000-token cap, the model learns to discard irrelevant metadata (ticket IDs) while preserving critical health states and risk flags.
+
+---
+
 ## 🖥️ Interactive Observatory
 
 The project includes a **Gradio-based Observatory** for real-time monitoring and replaying RL episodes.
@@ -124,15 +147,29 @@ The project includes a **Gradio-based Observatory** for real-time monitoring and
 
 ## 🖥 Deployment — Dual-Server Design
 
-The HuggingFace Space runs a single Docker container exposing two interfaces on port 7860:
-- **Gradio Observatory**: A glassmorphism dashboard for real-time monitoring.
-- **FastAPI OpenEnv**: A standardized API for RL agents to interact with the SRE simulator.
+Exposes two interfaces on port 7860:
+- **Gradio Observatory**: Glassmorphism dashboard for real-time monitoring and replaying episodes.
+- **FastAPI OpenEnv**: Standardized API for RL agents (`/reset`, `/step`, `/state`).
+
+### Repository Structure
+```
+shiftlog-gym/
+├── shiftlog_gym/
+│   ├── server/         ← FastAPI + OpenEnv endpoints
+│   ├── core/           ← Simulator, scenarios, and reward rubrics
+│   └── diagnostics/    ← Startup validation + log parsing
+├── observatory/        ← 5-tab Gradio dashboard UI
+├── train/              ← SFT and GRPO training pipelines
+├── plots/              ← Real training evidence assets
+├── tests/              ← Unit tests for environment logic
+├── openenv.yaml        ← OpenEnv manifest
+└── Dockerfile          ← Deployment container
+```
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Run Locally
 ```bash
 git clone https://huggingface.co/spaces/Chirag0123/shiftlog-gym
 cd shiftlog-gym
@@ -140,25 +177,20 @@ pip install -e ".[observatory]"
 uvicorn shiftlog_gym.server.app:app --port 7860
 ```
 
-### 2. Run Unit Tests
-```bash
-python -m unittest discover -s tests -v
-```
-
 ---
 
 ## 📚 Research Citations
 
-- **Memory-R1** (Yan et al., Jan 2026) — RL-trained memory operations.
+- **Memory-R1** (Yan et al., Jan 2026) — RL-trained ADD/UPDATE/DELETE/NOOP memory operations.
 - **AgeMem** (Yu et al., Jan 2026) — 5 RL-trained memory ops via 3-stage GRPO.
-- **Lost in the Middle** (Liu et al., 2024) — Grounding for context window accuracy decay.
-- **MemoryArena** (He et al., Feb 2026) — Multi-session task evaluation paradigm.
+- **Lost in the Middle** (Liu et al., 2024) — Context window accuracy decay grounding.
+- **MemoryArena** (He et al., Feb 2026) — Establishes interdependent multi-session evaluation.
 
 ---
 
 ## 👤 About the Author
 
-**Chirag Aswal** — Backend Engineer at AT&T. The failure scenarios in ShiftLog-Gym draw directly from production experience: real cascading failure patterns, real on-call memory failure modes, and real runbook gaps that cause repeated outages.
+**Chirag Aswal** — Backend Engineer at AT&T (Java/Spring Boot). The failure scenarios in ShiftLog-Gym draw directly from production experience: real cascading failure patterns, real on-call memory failure modes, and real runbook gaps that cause repeated outages.
 
 ---
 
