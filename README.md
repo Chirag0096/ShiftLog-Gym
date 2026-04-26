@@ -83,13 +83,13 @@ This formula ensures the model is *only* rewarded for recall if it happens *befo
 | Signal | Weight | Logic / Formula |
 |---|---:|---|
 | **R1 — Success** | **0.35** | $CorrectResolutions / TotalRealIncidents$ |
-| **R2 — Recall** | **0.25** | Causal check: `read_log` happened before `mitigate` on linked incidents. |
-| **R3 — Quality** | **0.15** | Keyword overlap between `fact` and scenario `ground_truth`. |
+| **R2 — Recall** | **0.25** | Causal check: `read\_log` happened before `mitigate` on linked incidents. |
+| **R3 — Quality** | **0.15** | Keyword overlap between `fact` and scenario `ground\_truth`. |
 | **R4 — Integrity** | **0.10** | Penalty for duplicate or contradictory log entries. |
 | **R5 — Efficiency** | **0.05** | $1.0 - (TotalToolCalls / MaxAllowedCalls)$ |
 | **R6 — Hallucination**| **0.05** | Penalty for mitigations not supported by diagnostic evidence. |
 | **R7 — Noise Res.** | **0.03** | Penalty for retrieving memory on independent (noise) incidents. |
-| **R8 — Handoff** | **0.02** | Qualitative check on final `handoff_summary` accuracy. |
+| **R8 — Handoff** | **0.02** | Qualitative check on final `handoff\_summary` accuracy. |
 
 ---
 
