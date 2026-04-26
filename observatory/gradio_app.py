@@ -85,27 +85,29 @@ def system_status_md():
 def start_demo():
     data, ms, err = _api("POST", "/reset", {"seed": 1, "family": "db_pool"})
     if err:
-        return [[None, f"❌ API error: {err}"]], "Reset failed"
+        return [{"role": "assistant", "content": f"❌ API error: {err}"}], "Reset failed"
     msg = data.get("message", "Episode started.")
-    chat = [[None, f"🚨 **New Incident**\n\n{msg[:600]}"]]
+    chat = [{"role": "assistant", "content": f"🚨 **New Incident**\n\n{msg[:600]}"}]
     info = "Step 0/5 — Click **Next Step** to run the demo action sequence"
     return chat, info
 
 def next_step(chat, step_idx):
     if step_idx >= len(DEMO_STEPS):
-        chat.append([None, "✅ **Demo complete!** All 5 steps executed."])
+        chat.append({"role": "assistant", "content": "✅ **Demo complete!** All 5 steps executed."})
         return chat, step_idx, "Episode complete"
     tool, args = DEMO_STEPS[step_idx]
     data, ms, err = _api("POST", "/step", {"tool": tool, "arguments": args})
     if err:
-        chat.append([f"`{tool}`", f"❌ Error: {err}"])
+        chat.append({"role": "user", "content": f"`{tool}`"})
+        chat.append({"role": "assistant", "content": f"❌ Error: {err}"})
         return chat, step_idx + 1, f"Error at step {step_idx + 1}"
     msg = data.get("message", "")
     rew = data.get("reward", 0.0)
     icons = {"read_shift_log": "📖", "inspect_service": "🔍", "run_diagnostic": "🧪",
              "apply_mitigation": "🛠", "resolve_incident": "✅"}
     icon = icons.get(tool, "⚙️")
-    chat.append([f"{icon} `{tool}`", f"**Reward:** {rew:+.3f} | {msg[:400]}"])
+    chat.append({"role": "user", "content": f"{icon} `{tool}`"})
+    chat.append({"role": "assistant", "content": f"**Reward:** {rew:+.3f} | {msg[:400]}"})
     return chat, step_idx + 1, f"Step {step_idx + 1}/5 | {tool} | {ms}ms"
 
 # ── Tab 2 ────────────────────────────────────────────────────────────────────
@@ -308,7 +310,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                     incident_info = gr.Markdown("_Click **Start Demo Episode** to begin_")
 
                 with gr.Column(scale=6):
-                    chatbot = gr.Chatbot(label="Agent Action Log", height=440, type="tuples")
+                    chatbot = gr.Chatbot(label="Agent Action Log", height=440)
 
             demo_btn.click(fn=start_demo, outputs=[chatbot, incident_info]).then(
                 fn=lambda: gr.update(interactive=True), outputs=[next_btn])
