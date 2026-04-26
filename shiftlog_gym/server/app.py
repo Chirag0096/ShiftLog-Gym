@@ -21,7 +21,15 @@ app = FastAPI(
 # Attach error-resilient middleware
 setup_middleware(app)
 
-session = ShiftLogToolEnv()
+# Lazy-initialize the session on first request to ensure fast startup
+_session: ShiftLogToolEnv | None = None
+
+def get_session() -> ShiftLogToolEnv:
+    """Get or create the session lazily on first use."""
+    global _session
+    if _session is None:
+        _session = ShiftLogToolEnv()
+    return _session
 
 
 # ---------------------------------------------------------------------------
@@ -40,20 +48,20 @@ async def on_startup() -> None:
 @app.post("/reset")
 def reset(payload: dict | None = None):
     """Reset the environment to a fresh episode."""
-    global session
+    global _session
     payload = payload or {}
     rollout_mode = payload.get("rollout_mode", "short")
-    session = ShiftLogToolEnv(
+    _session = ShiftLogToolEnv(
         rollout_mode=rollout_mode,
         multi_shift=bool(payload.get("multi_shift", False)),
     )
-    message = session.reset(
+    message = _session.reset(
         seed=payload.get("seed"),
         family=payload.get("family"),
         variant_index=payload.get("variant_index"),
         multi_shift=payload.get("multi_shift", False),
     )
-    observation = session.as_observation()
+    observation = _session.as_observation()
     observation.message = message or observation.message
     return observation.model_dump()
 
@@ -61,6 +69,7 @@ def reset(payload: dict | None = None):
 @app.post("/step")
 def step(action: ShiftLogAction):
     """Execute a tool action in the current episode."""
+    session = get_session()
     tool = getattr(session, action.tool, None)
     if tool is None or action.tool.startswith("_"):
         observation = session.as_observation()
@@ -75,12 +84,13 @@ def step(action: ShiftLogAction):
 @app.get("/state")
 def state():
     """Return current environment state."""
-    return session.get_info()
+    return get_session().get_info()
 
 
 @app.get("/tools")
 def tools():
     """Return list of valid tool names."""
+    # Don't need session for this
     return {
         "tools": [
             "read_shift_log", "append_shift_log", "update_shift_log",
