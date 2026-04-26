@@ -3,10 +3,7 @@ title: Shiftlog-Gym
 emoji: 🚀
 colorFrom: indigo
 colorTo: blue
-sdk: gradio
-sdk_version: 5.17.0
-app_file: app.py
-python_version: 3.11.9
+sdk: docker
 pinned: false
 license: mit
 ---
