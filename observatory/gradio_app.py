@@ -152,7 +152,7 @@ def load_metadata_text() -> str:
     except Exception as e:
         return f"Error reading metadata: {e}"
 
-def load_eval_table(stage: str):
+def load_eval_table(stage: str = "stageC"):
     path = RUNS_DIR / f"eval_summary_{stage}.csv"
     if not path.exists():
         return pd.DataFrame([{"status": f"No evaluation summary found for {stage} — run the training notebook first"}])

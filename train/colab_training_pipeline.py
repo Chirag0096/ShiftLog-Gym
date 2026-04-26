@@ -95,11 +95,11 @@ class ColabTrainingPipeline:
             )
 
     def load_model(self, model_name: str = "Qwen/Qwen2.5-1.5B-Instruct") -> None:
-        # FORCE bf16 automatically to avoid GradScaler fp16 crashes with natively bfloat16 models
-        self.use_bf16 = bool(torch.cuda.is_bf16_supported())
-        self.use_fp16 = not self.use_bf16
+        # Enforce fp16 universally. bfloat16 AMP scaling crashes native PyTorch 2.x GradScaler on 4-bit PEFT
+        self.use_bf16 = False
+        self.use_fp16 = True
 
-        compute_dtype = torch.bfloat16 if self.use_bf16 else torch.float16
+        compute_dtype = torch.float16
         bnb_cfg = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
