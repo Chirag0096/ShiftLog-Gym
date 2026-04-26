@@ -198,19 +198,28 @@ def refresh_results():
             load_plot("03_mttr_comparison.png"))
 
 def get_training_status():
-    """Read background training status from file with tail-like behavior."""
-    status_file = OBS / "training_status.txt"
-    if not status_file.exists():
+    """Read full background training log with tail-like behavior."""
+    log_file = OBS / "training_full_log.txt"
+    if not log_file.exists():
         import torch
         gpu_info = f" | GPU: {torch.cuda.get_device_name(0)}" if torch.cuda.is_available() else " | ❌ No GPU"
         return f"🟢 **Status:** Idle {gpu_info}\n\n*Logs will appear here once training starts.*"
     
     try:
-        content = status_file.read_text(encoding="utf-8")
-        # Keep only the last 15 lines for the UI box
+        # Read the last 2k characters to avoid UI lag while getting enough context
+        with open(log_file, "r") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - 4000)) # Get last 4000 characters
+            content = f.read()
+        
+        # Cleanup potential partial first line
         lines = content.split("\n")
-        display_text = "\n".join(lines[-20:])
-        return f"### 📝 Training Logs (Auto-refresh)\n```text\n{display_text}\n```"
+        if len(lines) > 1:
+            lines = lines[1:]
+        
+        display_text = "\n".join(lines[-30:]) # Show last 30 lines
+        return f"### 📝 Live Training Stream (Auto-refresh)\n```text\n{display_text}\n```"
     except Exception as e:
         return f"⚠️ Error reading logs: {e}"
 
