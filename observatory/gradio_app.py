@@ -206,26 +206,25 @@ def get_training_status():
         return f"🟢 **Status:** Idle {gpu_info}\n\n*Logs will appear here once training starts.*"
     
     try:
-        # Read the last 2k characters to avoid UI lag while getting enough context
+        # Read the last 8k characters
         with open(log_file, "r") as f:
             f.seek(0, os.SEEK_END)
             size = f.tell()
-            f.seek(max(0, size - 4000)) # Get last 4000 characters
+            f.seek(max(0, size - 8000)) 
             content = f.read()
         
-        # Cleanup potential partial first line
         lines = content.split("\n")
         if len(lines) > 1:
             lines = lines[1:]
         
-        display_text = "\n".join(lines[-30:]) # Show last 30 lines
-        return f"### 📝 Live Training Stream (Auto-refresh)\n```text\n{display_text}\n```"
+        return "\n".join(lines[-100:]) # Show last 100 lines
     except Exception as e:
-        return f"⚠️ Error reading logs: {e}"
+        return f"Error reading logs: {e}"
 
 def start_hf_training(repo_id, wandb_key):
     """Spawn run_training.py as a detached background process with environment variables."""
     status_file = OBS / "training_status.txt"
+    log_path = OBS / "training_full_log.txt"
     
     # Check if already running
     if status_file.exists():
@@ -233,13 +232,15 @@ def start_hf_training(repo_id, wandb_key):
         if "..." in current and "Done!" not in current and "ERROR" not in current:
              return gr.update(interactive=False), "⚠️ Training already in progress!"
     
-    # Initialize/Clear status file
+    # Initialize/Clear files
     status_file.write_text("🚀 [System] Launching training subprocess...\n", encoding="utf-8")
+    log_path.write_text("--- Training Log Started ---\n", encoding="utf-8")
     
     script_path = ROOT / "run_training.py"
     
-    # Prepare environment with the provided WandB key
+    # Prepare environment
     env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1" # CRITICAL for live logs
     if wandb_key:
         env["WANDB_API_KEY"] = wandb_key.strip()
         env["WANDB_MODE"] = "online"
@@ -247,9 +248,7 @@ def start_hf_training(repo_id, wandb_key):
         env["WANDB_MODE"] = "disabled"
     
     # Run as a detached subprocess
-    # We pipe stdout/stderr to a log file instead of /dev/null for persistent debugging
-    log_path = OBS / "training_full_log.txt"
-    with open(log_path, "w") as f:
+    with open(log_path, "a") as f:
         subprocess.Popen(
             [sys.executable, str(script_path), repo_id],
             cwd=str(ROOT),
@@ -259,7 +258,7 @@ def start_hf_training(repo_id, wandb_key):
             start_new_session=True
         )
     
-    return gr.update(interactive=False), "✅ Training process spawned successfully!"
+    return gr.update(interactive=False), "✅ Training process spawned! Switch to terminal view below."
 
 # ── Tab 3 ────────────────────────────────────────────────────────────────────
 
@@ -493,7 +492,13 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             gr.Markdown("### 🚀 Space GPU Training Center")
             with gr.Row():
                 with gr.Column(scale=2):
-                    tr_status = gr.Markdown(value=get_training_status(), label="Process Monitor")
+                    gr.Markdown("#### 📝 Live Terminal Output")
+                    tr_status = gr.Code(
+                        value=get_training_status(), 
+                        language="shell", 
+                        lines=25,
+                        label="Training Terminal"
+                    )
                     # Auto-refresh status every 2 seconds
                     gr.Timer(2.0, active=True).tick(fn=get_training_status, outputs=[tr_status])
                 
