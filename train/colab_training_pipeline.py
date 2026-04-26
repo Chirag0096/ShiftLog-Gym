@@ -54,11 +54,14 @@ class ColabTrainingPipeline:
         if not torch.cuda.is_available():
             raise RuntimeError("GPU required. Switch Colab runtime to T4/L4/A10G.")
 
-        self.obs_root = Path("observatory")
+        # Always resolve paths relative to the project root (parent of train/)
+        self._project_root = Path(__file__).resolve().parent.parent
+        self.obs_root = self._project_root / "observatory"
         self.runs_dir = self.obs_root / "training_runs"
         self.episodes_dir = self.obs_root / "episodes"
-        self.outputs_dir = Path("outputs")
-        for path in (self.obs_root, self.runs_dir, self.episodes_dir, self.outputs_dir):
+        self.outputs_dir = self._project_root / "outputs"
+        self.plots_dir = self._project_root / "plots"
+        for path in (self.obs_root, self.runs_dir, self.episodes_dir, self.outputs_dir, self.plots_dir):
             path.mkdir(parents=True, exist_ok=True)
 
         self.wandb_enabled = False
@@ -454,10 +457,9 @@ class ColabTrainingPipeline:
     def generate_hackathon_plots(self) -> None:
         import matplotlib.pyplot as plt
         import numpy as np
-        import os
         from datetime import datetime
         
-        os.makedirs("plots", exist_ok=True)
+        self.plots_dir.mkdir(parents=True, exist_ok=True)
         
         # 1. Total Reward Curve
         curve_stage_c = pd.read_csv(self.runs_dir / "training_curves_stageC.csv") if (self.runs_dir / "training_curves_stageC.csv").exists() else pd.DataFrame()
@@ -476,7 +478,7 @@ class ColabTrainingPipeline:
         ax.legend()
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
-        fig.savefig('plots/01_reward_curve.png', dpi=150)
+        fig.savefig(str(self.plots_dir / '01_reward_curve.png'), dpi=150)
         plt.close(fig)
 
         # 2. Recall Bonus Curve
@@ -494,7 +496,7 @@ class ColabTrainingPipeline:
         ax.legend()
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
-        fig.savefig('plots/02_recall_bonus_curve.png', dpi=150)
+        fig.savefig(str(self.plots_dir / '02_recall_bonus_curve.png'), dpi=150)
         plt.close(fig)
 
         # 3. MTTR Bar Chart
@@ -514,7 +516,7 @@ class ColabTrainingPipeline:
         ax.set_title('MTTR on Causally-Linked Incidents: Before vs After Training')
         ax.grid(True, axis='y', alpha=0.3)
         fig.tight_layout()
-        fig.savefig('plots/03_mttr_comparison.png', dpi=150)
+        fig.savefig(str(self.plots_dir / '03_mttr_comparison.png'), dpi=150)
         plt.close(fig)
 
     def evaluate_and_write(self) -> dict[str, Any]:
@@ -541,11 +543,10 @@ class ColabTrainingPipeline:
         payload["trained_llm"]["avg_total_reward"] = trained_stats.get("avg_total_reward", 0.0)
         payload["trained_llm"]["linked_incident_mttr"] = 3.5
 
-        import wandb
-        from datetime import datetime
         try:
-            run_id = wandb.run.id if wandb.run else "space_run"
-            run_url = wandb.run.url if wandb.run else ""
+            import wandb as _wandb
+            run_id = _wandb.run.id if _wandb.run else "space_run"
+            run_url = _wandb.run.url if _wandb.run else ""
         except Exception:
             run_id = "space_run"
             run_url = ""
@@ -569,9 +570,9 @@ class ColabTrainingPipeline:
             self.runs_dir / "training_curves_stageA.csv",
             self.runs_dir / "training_curves_stageC.csv",
             self.runs_dir / "eval_summary_stageC.csv",
-            Path("plots/01_reward_curve.png"),
-            Path("plots/02_recall_bonus_curve.png"),
-            Path("plots/03_mttr_comparison.png"),
+            self.plots_dir / "01_reward_curve.png",
+            self.plots_dir / "02_recall_bonus_curve.png",
+            self.plots_dir / "03_mttr_comparison.png",
         ]
         status = []
         for path in required:
@@ -588,7 +589,9 @@ class ColabTrainingPipeline:
             raise ValueError("HF_TOKEN missing.")
         api = HfApi(token=token)
         api.create_repo(repo_id=repo_id, repo_type="model", exist_ok=True)
-        api.upload_folder(repo_id=repo_id, repo_type="model", folder_path="outputs/grpo-stagec", path_in_repo="adapter")
+        grpo_dir = self.outputs_dir / "grpo-stagec"
+        if grpo_dir.exists():
+            api.upload_folder(repo_id=repo_id, repo_type="model", folder_path=str(grpo_dir), path_in_repo="adapter")
         api.upload_folder(repo_id=repo_id, repo_type="model", folder_path=str(self.runs_dir), path_in_repo="training_runs")
-        if Path("plots").exists():
-            api.upload_folder(repo_id=repo_id, repo_type="model", folder_path="plots", path_in_repo="plots")
+        if self.plots_dir.exists():
+            api.upload_folder(repo_id=repo_id, repo_type="model", folder_path=str(self.plots_dir), path_in_repo="plots")

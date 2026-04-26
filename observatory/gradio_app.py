@@ -201,14 +201,17 @@ def trigger_training(hf_repo):
     env["OMP_NUM_THREADS"] = "1"
     env["MKL_NUM_THREADS"] = "1"
     
+    LOG_FILE = ROOT / "observatory" / "training_subprocess.log"
+    log_fh = open(LOG_FILE, "w", encoding="utf-8")
+    
     # Use absolute path to run_training.py and explicit ROOT cwd to avoid path resolution issues
     script_path = str(ROOT / "run_training.py")
     subprocess.Popen(
         [sys.executable, script_path, str(hf_repo or "")],
         cwd=str(ROOT),
         env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=log_fh,
+        stderr=log_fh,
     )
     return "🚀 Training job submitted to detached subprocess. Click '🔄 Check Status' to monitor progress."
 

@@ -25,6 +25,7 @@ COPY --chown=user observatory ./observatory
 COPY --chown=user train ./train
 COPY --chown=user tests ./tests
 COPY --chown=user app.py .
+COPY --chown=user run_training.py .
 COPY --chown=user README.md .
 
 RUN mkdir -p plots && chown user:user plots
