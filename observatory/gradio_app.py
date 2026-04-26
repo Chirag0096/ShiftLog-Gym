@@ -345,45 +345,6 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
         with gr.Tab("🧠 Research Story"):
             gr.HTML(STORY_HTML)
 
-                    # Diagnostic area: reports whether CSS loaded and tab clicks
-                    diag_html = '''
-    <div id="diag" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:rgba(0,0,0,0.6);color:#fff;padding:8px 12px;border-radius:8px;font-size:0.9rem">
-        <div><strong>UI Diagnostics</strong></div>
-        <div id="diag-css">CSS: checking...</div>
-        <div id="diag-last">Last tab clicked: none</div>
-    </div>
-    <script>
-        (function(){
-            function setText(id, txt){
-                var el = document.getElementById(id); if(el) el.textContent = txt;
-            }
-            // Check for our custom CSS rules presence
-            var tablist = document.querySelector('.gradio-container [role="tablist"]');
-            if(tablist){
-                var cs = window.getComputedStyle(tablist);
-                var pe = cs.pointerEvents || '';
-                var zi = cs.zIndex || '';
-                setText('diag-css', 'CSS: OK (pointer-events='+pe+', z-index='+zi+')');
-                var tabs = document.querySelectorAll('.gradio-container [role="tab"]');
-                tabs.forEach(function(t,i){
-                    t.addEventListener('click', function(ev){
-                        var txt = t.textContent || t.innerText || ('tab-'+i);
-                        setText('diag-last', 'Last tab clicked: '+txt.trim());
-                    });
-                });
-            } else {
-                setText('diag-css', 'CSS: tablist element not found');
-                // Retry after a short delay (Gradio may mount elements asynchronously)
-                setTimeout(function(){
-                    var tl = document.querySelector('.gradio-container [role="tablist"]');
-                    if(tl) location.reload();
-                }, 1200);
-            }
-        })();
-    </script>
-    '''
-                    gr.HTML(diag_html)
-
         # TAB 4 — API Explorer
         with gr.Tab("⚙️ API Explorer"):
             gr.Markdown("### Live API Tester — no curl needed")
@@ -419,5 +380,38 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             hc_btn.click(fn=run_health_check_ui,
                          outputs=[health_hdr, api_md, scen_md, art_md])
 
-if __name__ == "__main__":
+    # Diagnostic area: reports whether CSS loaded and tab clicks
+    diag_html = '''<div id="diag" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:rgba(0,0,0,0.6);color:#fff;padding:8px 12px;border-radius:8px;font-size:0.9rem">
+  <div><strong>UI Diagnostics</strong></div>
+  <div id="diag-css">CSS: checking...</div>
+  <div id="diag-last">Last tab clicked: none</div>
+</div>
+<script>
+  (function(){
+    function setText(id, txt){
+      var el = document.getElementById(id); if(el) el.textContent = txt;
+    }
+    var tablist = document.querySelector('.gradio-container [role="tablist"]');
+    if(tablist){
+      var cs = window.getComputedStyle(tablist);
+      var pe = cs.pointerEvents || '';
+      var zi = cs.zIndex || '';
+      setText('diag-css', 'CSS: OK (pointer-events='+pe+', z-index='+zi+')');
+      var tabs = document.querySelectorAll('.gradio-container [role="tab"]');
+      tabs.forEach(function(t,i){
+        t.addEventListener('click', function(ev){
+          var txt = t.textContent || t.innerText || ('tab-'+i);
+          setText('diag-last', 'Last tab clicked: '+txt.trim());
+        });
+      });
+    } else {
+      setText('diag-css', 'CSS: tablist element not found');
+      setTimeout(function(){
+        var tl = document.querySelector('.gradio-container [role="tablist"]');
+        if(tl) location.reload();
+      }, 1200);
+    }
+  })();
+</script>'''
+    gr.HTML(diag_html)
     demo.launch(css=custom_css)
