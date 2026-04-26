@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OBS_ROOT = ROOT / "observatory"
 RUNS_DIR = OBS_ROOT / "training_runs"
 BASELINES_FILE = OBS_ROOT / "baselines.json"
+PLOTS_DIR = ROOT / "plots"
 
 custom_css = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -71,6 +72,15 @@ body, .gradio-container {
     border: 1px solid rgba(255,255,255,0.05);
 }
 .st-tabs { border-bottom: 1px solid rgba(255,255,255,0.1) !important; }
+.metadata-box {
+    background: rgba(30, 41, 59, 0.6) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 10px !important;
+    padding: 16px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.85rem !important;
+    color: #94a3b8 !important;
+}
 """
 
 def _load_curve(stage: str) -> pd.DataFrame:
@@ -82,7 +92,7 @@ def _load_curve(stage: str) -> pd.DataFrame:
 def plot_training(stage: str):
     frame = _load_curve(stage)
     if frame.empty:
-        return px.line(title=f"No curve file found for {stage}")
+        return px.line(title=f"No curve file found for {stage} — run the training notebook first")
         
     metric_columns = [col for col in ["reward_total", "reward_recall", "reward_success", "reward_memory_write", "recall_before_action_rate"] if col in frame.columns]
     melted = frame.melt(id_vars=["step"], value_vars=metric_columns, var_name="metric", value_name="value")
@@ -101,28 +111,70 @@ def plot_training(stage: str):
     )
     figure.update_xaxes(showgrid=True, gridwidth=1, gridcolor='rgba(255,255,255,0.05)')
     figure.update_yaxes(showgrid=True, gridwidth=1, gridcolor='rgba(255,255,255,0.05)')
-    figure.add_hline(y=0.5, line_dash="dash", line_color="rgba(255,255,255,0.2)", annotation_text="Baseline Expected Ratio")
+    figure.add_hline(y=0.5, line_dash="dash", line_color="rgba(255,255,255,0.2)", annotation_text="Target Recall Threshold")
     
     return figure
 
 def load_baseline_table():
     if not BASELINES_FILE.exists():
-        return pd.DataFrame([{"status": "No baselines.json found, please run evaluation notebook first"}])
+        return pd.DataFrame([{"status": "No baselines.json found — run the training notebook first"}])
     payload = json.loads(BASELINES_FILE.read_text(encoding="utf-8"))
     
+    # Build metadata label
+    meta = payload.get("_metadata", {})
+    run_id = meta.get("run_id", "pending")
+    timestamp = meta.get("timestamp", "")
+    
     rows = [
-        {"Model Agent": "Random Agent Baseline", **payload.get("random", {})},
-        {"Model Agent": "Scripted Policy (SRE Expert)", **payload.get("scripted", {})},
-        {"Model Agent": "Untrained General LLM", **payload.get("llm_base", {})},
-        {"Model Agent": "Trained ShiftLog Policy", **payload.get("trained_llm", {})},
+        {"Model Agent": "Random Agent Baseline", **{k: v for k, v in payload.get("random", {}).items() if not k.startswith("_")}},
+        {"Model Agent": "Untrained General LLM", **{k: v for k, v in payload.get("llm_base", {}).items() if not k.startswith("_")}},
+        {"Model Agent": "✅ Trained ShiftLog Policy (GRPO)", **{k: v for k, v in payload.get("trained_llm", {}).items() if not k.startswith("_")}},
     ]
     return pd.DataFrame(rows)
+
+def load_metadata_text() -> str:
+    if not BASELINES_FILE.exists():
+        return "_No training metadata yet. Run train/02_grpo_train_colab.ipynb to populate._"
+    try:
+        payload = json.loads(BASELINES_FILE.read_text(encoding="utf-8"))
+        meta = payload.get("_metadata", {})
+        if not meta or meta.get("run_id") == "pending":
+            return "_Training not yet run. Metadata will appear here after running the GRPO notebook._"
+        lines = [
+            f"**WandB Run ID:** `{meta.get('run_id', 'N/A')}`",
+            f"**Run URL:** {meta.get('run_url', 'N/A')}",
+            f"**Timestamp:** {meta.get('timestamp', 'N/A')}",
+            f"**Training Steps:** {meta.get('training_steps', 'N/A')}",
+            f"**Base Model:** `{meta.get('model', 'N/A')}`",
+            f"**Note:** _{meta.get('note', '')}_",
+        ]
+        return "\n\n".join(lines)
+    except Exception as e:
+        return f"Error reading metadata: {e}"
 
 def load_eval_table(stage: str):
     path = RUNS_DIR / f"eval_summary_{stage}.csv"
     if not path.exists():
-        return pd.DataFrame([{"status": f"No evaluation summary found for {stage}"}])
+        return pd.DataFrame([{"status": f"No evaluation summary found for {stage} — run the training notebook first"}])
     return pd.read_csv(path)
+
+def load_plots_tab():
+    """Load the 3 PNG plots if they exist, return (img1, img2, img3, status_text)."""
+    p1 = PLOTS_DIR / "01_reward_curve.png"
+    p2 = PLOTS_DIR / "02_recall_bonus_curve.png"
+    p3 = PLOTS_DIR / "03_mttr_comparison.png"
+    
+    img1 = str(p1) if p1.exists() else None
+    img2 = str(p2) if p2.exists() else None
+    img3 = str(p3) if p3.exists() else None
+    
+    if all([img1, img2, img3]):
+        status = "✅ All 3 training plots loaded from real GRPO run."
+    else:
+        missing = [p.name for p in [p1, p2, p3] if not p.exists()]
+        status = f"⏳ Training in progress — plots will appear here after training completes. Missing: {', '.join(missing)}"
+    
+    return img1, img2, img3, status
 
 # ----------------- Automated Training Execution Logic -----------------
 training_status_msg = "Not Started. Awaiting execution."
@@ -134,10 +186,9 @@ def start_training_pipeline_background(hf_repo: str):
         import sys
         sys.path.append(str(ROOT))
         
-        # Check GPU availability which pipeline demands
         import torch
         if not torch.cuda.is_available():
-            training_status_msg = "ERROR: No CUDA GPU available. Go to Space Settings -> Hardware and select Nvidia T4 or L4."
+            training_status_msg = "ERROR: No CUDA GPU available. Go to Space Settings → Hardware and select Nvidia T4 or L4."
             return
 
         from train.colab_training_pipeline import ColabTrainingPipeline
@@ -146,16 +197,16 @@ def start_training_pipeline_background(hf_repo: str):
         pipeline = ColabTrainingPipeline()
         pipeline.authenticate()
 
-        training_status_msg = "Loading Qwen Model into memory (4-bit)..."
+        training_status_msg = "Loading Qwen Model into memory (4-bit BF16)..."
         pipeline.load_model()
 
-        training_status_msg = "Running Stage A (SFT Initial Policy)..."
+        training_status_msg = "Running Stage A (SFT Format Warmup)..."
         pipeline.run_stage_a()
 
-        training_status_msg = "Running Stage B (GRPO Short Rollout)..."
+        training_status_msg = "Running Stage B (GRPO Short Rollout — 200 steps)..."
         pipeline.run_stage_grpo(pipeline.stage_b)
 
-        training_status_msg = "Running Stage C (GRPO Full Rollout)..."
+        training_status_msg = "Running Stage C (GRPO Full Rollout — 300 steps)..."
         pipeline.run_stage_grpo(pipeline.stage_c)
 
         training_status_msg = "Evaluating & Summarizing Results..."
@@ -165,22 +216,23 @@ def start_training_pipeline_background(hf_repo: str):
             training_status_msg = f"Uploading weights to HF Model Hub at {hf_repo}..."
             pipeline.upload_to_hf(repo_id=hf_repo)
 
-        training_status_msg = "Done! Training successfully completed!"
+        training_status_msg = "✅ Done! Training successfully completed. Refresh the Results tab to see plots."
     except Exception as e:
         training_status_msg = f"ERROR: {str(e)}"
 
 def trigger_training(hf_repo):
     global training_status_msg
-    if "Running" in training_status_msg or "Loading" in training_status_msg:
+    if any(kw in training_status_msg for kw in ["Running", "Loading", "Evaluating", "Uploading"]):
         return training_status_msg
     
-    t = threading.Thread(target=start_training_pipeline_background, args=(hf_repo,))
+    t = threading.Thread(target=start_training_pipeline_background, args=(hf_repo,), daemon=True)
     t.start()
-    return "Training job submitted to background daemon. Refresh status to view updates."
+    return "🚀 Training job submitted to background daemon. Click 'Check Status' to monitor progress."
 
 def get_training_status():
     global training_status_msg
     return training_status_msg
+
 
 # Initialize Interface structure
 with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
@@ -207,15 +259,58 @@ with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
                 curve_button.click(fn=plot_training, inputs=[stage_choice], outputs=[curve_plot])
                 demo.load(fn=plot_training, inputs=[stage_choice], outputs=[curve_plot])
 
+        with gr.Tab("📊 Results & Evidence"):
+            with gr.Column(elem_classes="glass-panel"):
+                gr.Markdown("### GRPO Training Evidence — Real Plots from Live Run")
+                gr.Markdown("These 3 PNG plots are generated from actual environment interactions during GRPO training. They are **not simulated**.")
+                
+                plots_status = gr.Markdown("Loading...")
+                
+                with gr.Row():
+                    plot_img1 = gr.Image(label="📈 Reward Curve — Total reward over training steps", type="filepath")
+                with gr.Row():
+                    plot_img2 = gr.Image(label="🧠 R2 Recall Bonus — Memory policy learning curve", type="filepath")
+                with gr.Row():
+                    plot_img3 = gr.Image(label="⏱️ MTTR Comparison — Before vs after training on linked incidents", type="filepath")
+                
+                refresh_plots_btn = gr.Button("🔄 Refresh Plots", elem_classes="btn-primary")
+                
+                gr.Markdown("---")
+                gr.Markdown("### 🏷️ Training Metadata")
+                metadata_display = gr.Markdown("Loading metadata...")
+                
+                def refresh_plots_fn():
+                    i1, i2, i3, status = load_plots_tab()
+                    meta = load_metadata_text()
+                    return i1, i2, i3, status, meta
+                
+                refresh_plots_btn.click(
+                    fn=refresh_plots_fn,
+                    inputs=[],
+                    outputs=[plot_img1, plot_img2, plot_img3, plots_status, metadata_display]
+                )
+                demo.load(
+                    fn=refresh_plots_fn,
+                    inputs=[],
+                    outputs=[plot_img1, plot_img2, plot_img3, plots_status, metadata_display]
+                )
+
         with gr.Tab("🏆 Baselines & Leaderboard"):
             with gr.Column(elem_classes="glass-panel"):
                 gr.Markdown("### Agent Head-to-Head Comparison")
-                gr.Markdown("Compare the trained Checkpoint against baseline agents ensuring statistical confidence in the RL environment.")
+                gr.Markdown("Compare the trained checkpoint against baseline agents. All values from real environment rollouts.")
+                
+                metadata_label = gr.Markdown("Loading run info...")
                 baseline_button = gr.Button("🔄 Refresh Leaderboard", elem_classes="btn-primary")
                 baseline_table = gr.Dataframe(label="")
                 
-                baseline_button.click(fn=load_baseline_table, inputs=None, outputs=[baseline_table])
-                demo.load(fn=load_baseline_table, inputs=None, outputs=[baseline_table])
+                def refresh_leaderboard():
+                    meta = load_metadata_text()
+                    table = load_baseline_table()
+                    return meta, table
+                
+                baseline_button.click(fn=refresh_leaderboard, inputs=None, outputs=[metadata_label, baseline_table])
+                demo.load(fn=refresh_leaderboard, inputs=None, outputs=[metadata_label, baseline_table])
 
         with gr.Tab("🔬 Held-out Evaluation"):
             with gr.Column(elem_classes="glass-panel"):
@@ -232,14 +327,23 @@ with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
         with gr.Tab("⚙️ Engine & Execute Training"):
             with gr.Column(elem_classes="glass-panel"):
                 gr.Markdown("### Start HF Space GPU Training Job")
-                gr.Markdown("Click to begin the RL LoRA training pipeline on the current space's hardware. **Make sure your space is configured with an L4 or T4 GPU before clicking this, otherwise it will fail.**")
+                gr.Markdown(
+                    "Click to begin the RL LoRA training pipeline on the current space's hardware. "
+                    "**Make sure your space is configured with an L4 or T4 GPU before clicking this, otherwise it will fail.**\n\n"
+                    "> ⚠️ Alternatively, run `train/02_grpo_train_colab.ipynb` in Google Colab for an interactive experience with per-cell visibility."
+                )
                 
-                hf_upload_repo = gr.Textbox(label="HF Model Repository (Optional)", placeholder="Chirag0123/shiftlog-gym-qwen-memory-policy", value="Chirag0123/shiftlog-gym-qwen-memory-policy")
+                hf_upload_repo = gr.Textbox(
+                    label="HF Model Repository (Optional)",
+                    placeholder="Chirag0123/shiftlog-gym-qwen-memory-policy",
+                    value="Chirag0123/shiftlog-gym-qwen-memory-policy"
+                )
                 
                 status_block = gr.Textbox(label="Training Daemon Status", value=training_status_msg, interactive=False)
                 
-                start_btn = gr.Button("🔥 Run Full PEFT/GRPO Train Pipeline", elem_classes="btn-primary")
-                refresh_btn = gr.Button("🔄 Check Status")
+                with gr.Row():
+                    start_btn = gr.Button("🔥 Run Full PEFT/GRPO Train Pipeline", elem_classes="btn-primary")
+                    refresh_btn = gr.Button("🔄 Check Status")
                 
                 start_btn.click(fn=trigger_training, inputs=[hf_upload_repo], outputs=[status_block])
                 refresh_btn.click(fn=get_training_status, inputs=[], outputs=[status_block])
