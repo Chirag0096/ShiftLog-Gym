@@ -188,9 +188,10 @@ def get_training_status():
 
 def trigger_training(hf_repo):
     import subprocess
+    import sys
     import os
     status = get_training_status()
-    if any(kw in status for kw in ["Running", "Loading", "Evaluating", "Uploading", "Initializing"]):
+    if any(kw in status for kw in ["Running", "Loading", "Evaluating", "Uploading", "Initializing", "Preparing"]):
         return status
     
     STATUS_FILE.write_text("Preparing decoupled training subprocess...", encoding="utf-8")
@@ -200,8 +201,16 @@ def trigger_training(hf_repo):
     env["OMP_NUM_THREADS"] = "1"
     env["MKL_NUM_THREADS"] = "1"
     
-    subprocess.Popen(["python", "run_training.py", str(hf_repo or "")], env=env)
-    return "🚀 Training job submitted to detached subprocess. Click 'Check Status' to monitor progress."
+    # Use absolute path to run_training.py and explicit ROOT cwd to avoid path resolution issues
+    script_path = str(ROOT / "run_training.py")
+    subprocess.Popen(
+        [sys.executable, script_path, str(hf_repo or "")],
+        cwd=str(ROOT),
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return "🚀 Training job submitted to detached subprocess. Click '🔄 Check Status' to monitor progress."
 
 
 # Initialize Interface structure
