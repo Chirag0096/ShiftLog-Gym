@@ -449,11 +449,15 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
         });
       });
     } else {
-      setText('diag-css', 'CSS: tablist element not found');
+      setText('diag-css', 'CSS: tablist element not found (retrying...)');
       setTimeout(function(){
         var tl = document.querySelector('.gradio-container [role="tablist"]');
-        if(tl) location.reload();
-      }, 1200);
+        if(tl) {
+          setText('diag-css', 'CSS: OK (found after delay)');
+        } else {
+          setText('diag-css', 'CSS: tablist still not found');
+        }
+      }, 2000);
     }
   })();
 </script>'''
