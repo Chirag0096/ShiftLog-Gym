@@ -300,7 +300,7 @@ with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
                     value="Chirag0123/shiftlog-gym-qwen-memory-policy"
                 )
                 
-                status_block = gr.Textbox(label="Training Daemon Status", value=training_status_msg, interactive=False)
+                status_block = gr.Textbox(label="Training Daemon Status", value=get_training_status(), interactive=False)
                 
                 with gr.Row():
                     start_btn = gr.Button("🔥 Run Full PEFT/GRPO Train Pipeline", elem_classes="btn-primary")
