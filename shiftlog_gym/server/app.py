@@ -25,25 +25,12 @@ session = ShiftLogToolEnv()
 
 
 # ---------------------------------------------------------------------------
-# Startup — run health check and write health_status.json
+# Startup — skip heavy health check to prevent 30-min timeout in Spaces
 # ---------------------------------------------------------------------------
 @app.on_event("startup")
-async def run_health_check() -> None:
-    """Run all health checks on startup and write results to health_status.json."""
-    import asyncio
-
-    async def _deferred() -> None:
-        # Wait briefly so the server is fully ready before hitting /reset
-        await asyncio.sleep(3)
-        try:
-            from ..diagnostics.health_check import run_full_health_check
-            results = run_full_health_check(base_url="http://localhost:7860")
-            icon = {"ok": "✅", "degraded": "⚠️", "down": "❌"}.get(results["overall"], "❓")
-            logger.info("%s Startup health check: %s", icon, results["overall"])
-        except Exception as exc:
-            logger.warning("Health check failed to run: %s", exc)
-
-    asyncio.create_task(_deferred())
+async def on_startup() -> None:
+    """Fast startup event — avoid calling expensive health checks that can timeout."""
+    logger.info("✅ ShiftLog-Gym API server started. Use /health endpoint for status checks.")
 
 
 # ---------------------------------------------------------------------------
