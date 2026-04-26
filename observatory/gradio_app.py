@@ -376,4 +376,4 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                          outputs=[health_hdr, api_md, scen_md, art_md])
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(css=custom_css)
