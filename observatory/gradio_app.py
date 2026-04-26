@@ -186,12 +186,19 @@ def get_training_status():
 
 def trigger_training(hf_repo):
     import subprocess
+    import os
     status = get_training_status()
     if any(kw in status for kw in ["Running", "Loading", "Evaluating", "Uploading", "Initializing"]):
         return status
     
     STATUS_FILE.write_text("Preparing decoupled training subprocess...", encoding="utf-8")
-    subprocess.Popen(["python", "run_training.py", str(hf_repo or "")])
+    
+    # Throttle PyTorch CPU usage so the FastApi Uvicorn server doesn't get starved!
+    env = os.environ.copy()
+    env["OMP_NUM_THREADS"] = "1"
+    env["MKL_NUM_THREADS"] = "1"
+    
+    subprocess.Popen(["python", "run_training.py", str(hf_repo or "")], env=env)
     return "🚀 Training job submitted to detached subprocess. Click 'Check Status' to monitor progress."
 
 
