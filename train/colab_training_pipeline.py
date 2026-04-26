@@ -448,8 +448,11 @@ class ColabTrainingPipeline:
     def rollout_eval(self, tag: str, families: tuple[str, ...], episodes: int = 20, max_steps: int = 18) -> tuple[pd.DataFrame, dict[str, Any]]:
         rows = []
         replays = []
+        print(f"🚀 Starting evaluation for {tag} ({episodes} episodes)...", flush=True)
         for idx in range(episodes):
             family = families[idx % len(families)]
+            if idx % 5 == 0:
+                print(f"  [{tag}] Episode {idx}/{episodes} (family: {family})...", flush=True)
             simulator = ShiftLogSimulator()
             simulator.reset(seed=8000 + idx, family=family, variant_index=7)
 
