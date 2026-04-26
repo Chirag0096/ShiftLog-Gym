@@ -12,6 +12,15 @@ PLOTS    = ROOT / "plots"
 API_BASE = os.environ.get("SPACE_API_URL", "http://localhost:7860")
 TIMEOUT  = 10.0
 
+# Attempt to import internal logic for direct calls (bypasses HTTP deadlocks)
+try:
+    from shiftlog_gym.server.app import (
+        internal_reset, internal_step, internal_get_state, internal_get_tools
+    )
+    HAS_INTERNAL = True
+except ImportError:
+    HAS_INTERNAL = False
+
 TOOL_EXAMPLES = {
     "/reset": {"seed": 1, "family": "db_pool"},
     "/step":  {"tool": "read_shift_log", "arguments": {"query": "payment service", "limit": 3}},
@@ -43,7 +52,33 @@ body,.gradio-container{font-family:"Inter",sans-serif!important;background:#0b0f
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _api(method: str, path: str, body=None):
+    """
+    Unified API caller. Uses direct function calls if HAS_INTERNAL=True 
+     and API_BASE is localhost, otherwise falls back to httpx.
+    """
     start = time.monotonic()
+    
+    # Try direct call first if on localhost to avoid deadlocks
+    if HAS_INTERNAL and ("localhost" in API_BASE or "127.0.0.1" in API_BASE):
+        try:
+            if path == "/reset":
+                data = internal_reset(body)
+            elif path == "/step":
+                data = internal_step(body)
+            elif path == "/state":
+                data = internal_get_state()
+            elif path == "/tools":
+                data = internal_get_tools()
+            else:
+                raise ValueError(f"Unknown internal path: {path}")
+            
+            ms = round((time.monotonic() - start) * 1000)
+            return data, ms, None
+        except Exception as exc:
+            ms = round((time.monotonic() - start) * 1000)
+            return {}, ms, str(exc)
+
+    # Fallback to HTTP
     try:
         fn = httpx.post if method == "POST" else httpx.get
         kw = {"timeout": TIMEOUT}
@@ -237,7 +272,16 @@ def prefill_body(endpoint):
 def run_health_check_ui():
     try:
         from shiftlog_gym.diagnostics.health_check import run_full_health_check
-        h = run_full_health_check(base_url=API_BASE)
+        # Pass direct callers if available to avoid deadlocks
+        call_direct = None
+        if HAS_INTERNAL:
+            call_direct = {
+                "/reset": internal_reset,
+                "/step": internal_step,
+                "/state": internal_get_state,
+                "/tools": internal_get_tools
+            }
+        h = run_full_health_check(base_url=API_BASE, call_direct=call_direct)
     except Exception as exc:
         empty = f"Health check failed: {exc}"
         return empty, empty, empty, empty

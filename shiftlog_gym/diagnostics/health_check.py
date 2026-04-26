@@ -34,19 +34,23 @@ VALID_TOOLS = [
 # 1A — API Health Check
 # ---------------------------------------------------------------------------
 
-def check_api_health(base_url: str = "http://localhost:7860") -> dict[str, Any]:
+def check_api_health(base_url: str = "http://localhost:7860", 
+                     call_direct: dict[str, Callable] | None = None) -> dict[str, Any]:
     """
     Check all 4 API endpoints: /reset, /step, /state, /tools.
+
+    Args:
+        base_url: The URL to check (if not call_direct)
+        call_direct: Optional map of paths to local functions to avoid HTTP calls.
 
     Returns:
         dict with keys: status ("ok"|"degraded"|"down"), checks (list), errors (list)
     """
-    try:
-        import httpx
-    except ImportError:
-        import urllib.request as _req
-        import urllib.error
-        return _check_api_health_stdlib(base_url)
+    if not call_direct:
+        try:
+            import httpx
+        except ImportError:
+            return _check_api_health_stdlib(base_url)
 
     checks: list[dict] = []
     errors: list[str] = []
@@ -55,29 +59,35 @@ def check_api_health(base_url: str = "http://localhost:7860") -> dict[str, Any]:
                 expect_keys: list[str] | None = None) -> bool:
         start = time.monotonic()
         try:
-            if method == "POST":
-                r = httpx.post(f"{base_url}{path}", json=body or {}, timeout=10.0)
+            # Use direct call if available, otherwise use httpx
+            if call_direct and path in call_direct:
+                data = call_direct[path](body) if method == "POST" else call_direct[path]()
+                status_code = 200
+                ok = True
             else:
-                r = httpx.get(f"{base_url}{path}", timeout=10.0)
+                import httpx
+                if method == "POST":
+                    r = httpx.post(f"{base_url}{path}", json=body or {}, timeout=10.0)
+                else:
+                    r = httpx.get(f"{base_url}{path}", timeout=10.0)
+                status_code = r.status_code
+                ok = (status_code == 200)
+                data = r.json() if ok else {}
+
             elapsed_ms = round((time.monotonic() - start) * 1000)
-            ok = r.status_code == 200
-            data = {}
-            try:
-                data = r.json()
-            except Exception:
-                pass
             key_ok = True
             if expect_keys and ok:
                 for k in expect_keys:
                     if k not in data:
                         key_ok = False
                         errors.append(f"{name}: missing key '{k}' in response")
+            
             checks.append({
                 "name": name, "status": "ok" if (ok and key_ok) else "fail",
-                "status_code": r.status_code, "response_ms": elapsed_ms,
+                "status_code": status_code, "response_ms": elapsed_ms,
             })
             if not ok:
-                errors.append(f"{name}: HTTP {r.status_code}")
+                errors.append(f"{name}: HTTP {status_code}")
             return ok and key_ok
         except Exception as exc:
             elapsed_ms = round((time.monotonic() - start) * 1000)
@@ -337,16 +347,21 @@ def parse_recent_logs(log_file_path: str = "logs/runtime.log") -> dict[str, Any]
 # 1E — Full health check runner
 # ---------------------------------------------------------------------------
 
-def run_full_health_check(base_url: str = "http://localhost:7860") -> dict[str, Any]:
+def run_full_health_check(base_url: str = "http://localhost:7860",
+                           call_direct: dict[str, Callable] | None = None) -> dict[str, Any]:
     """
     Run all health checks and write results to observatory/health_status.json.
+
+    Args:
+        base_url: The URL to check (if not call_direct)
+        call_direct: Optional map of paths to local functions to avoid HTTP calls.
 
     Returns:
         Combined health status dict.
     """
     import datetime
 
-    api_result = check_api_health(base_url)
+    api_result = check_api_health(base_url, call_direct=call_direct)
     scenario_result = validate_scenarios()
     artifact_result = check_training_artifacts()
     log_result = parse_recent_logs()
