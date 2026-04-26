@@ -284,7 +284,7 @@ def run_health_check_ui():
 
 # ── Build Blocks ──────────────────────────────────────────────────────────────
 
-with gr.Blocks(title="ShiftLog-Gym Observatory", css=custom_css) as demo:
+with gr.Blocks(title="ShiftLog-Gym Observatory") as demo:
 
     gr.HTML("""<div style="text-align:center;padding:28px 0 8px">
 <h1 style="background:linear-gradient(90deg,#38bdf8,#818cf8,#c084fc);
@@ -312,7 +312,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                     incident_info = gr.Markdown("_Click **Start Demo Episode** to begin_")
 
                 with gr.Column(scale=6):
-                    chatbot = gr.Chatbot(label="Agent Action Log", height=440, type="messages")
+                    chatbot = gr.Chatbot(label="Agent Action Log", height=440)
 
             demo_btn.click(fn=start_demo, outputs=[chatbot, incident_info]).then(
                 fn=lambda: gr.update(interactive=True), outputs=[next_btn])
@@ -379,4 +379,4 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                          outputs=[health_hdr, api_md, scen_md, art_md])
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(css=custom_css)
