@@ -49,19 +49,7 @@ Prior memory work such as Memory-R1, Mem-α, and MemAgent targets conversational
 | HandoffQuality | 0.02 | Produce a usable handoff with unresolved incident IDs, causes, and confidence. |
 
 ### Results
-![Baseline Comparison](observatory/baseline_comparison.png)
-
-Caption: `observatory/baseline_comparison.png` compares the random agent, scripted agent, untrained LLM baseline, and trained model on recall-before-action, linked-incident success, noise resistance, and weighted reward.
-
-![Stage B Curves](observatory/training_runs/training_curves_stageB.png)
-
-Caption: Stage B focuses on the short-rollout memory-policy habit: read before acting on linked incidents.
-
-![Stage C Curves](observatory/training_runs/training_curves_stageC.png)
-
-Caption: Stage C scales the same policy to all six families with noise incidents and full-rollout episodes.
-
-Before/after recall_before_action_rate is reported from the baseline notebook and the Stage B/Stage C training curves in `observatory/training_runs/training_curves_stageB.csv` and `observatory/training_runs/training_curves_stageC.csv`.
+> **Note:** Static training curves have been deprecated in favor of our live interactive dashboard! Please visit our [Hugging Face Space](https://huggingface.co/spaces/Chirag0123/shiftlog-gym) and click the **Model Metrics & Leaderboard** tabs to see the live causal memory retention improvements and the agent head-to-head comparison!
 
 ### Differentiation from Prior Work
 | Capability | Memory-R1 | Mem-α | MemAgent | ShiftLog-Gym |
