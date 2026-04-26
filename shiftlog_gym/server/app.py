@@ -9,17 +9,6 @@ app = FastAPI(title="ShiftLog-Gym", version="0.1.0")
 session = ShiftLogToolEnv()
 
 
-@app.get("/")
-def root():
-    return {
-        "name": "ShiftLog-Gym",
-        "claim": "A domain-specific professional RL environment for memory management with causal incident dependencies and verifiable outcome rewards.",
-        "status": "ok",
-        "multi_shift_mode": True,
-        "supports_noise_incidents": True,
-    }
-
-
 @app.post("/reset")
 def reset(payload: dict | None = None):
     global session
