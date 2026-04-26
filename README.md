@@ -87,6 +87,4 @@ Training notebooks live in [train/01_env_smoke_test.ipynb](/Users/chiragaswal/De
 For Hugging Face hardware and budgeted execution flow, follow [docs/HF_SETUP_AND_GPU_PLAN.md](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/docs/HF_SETUP_AND_GPU_PLAN.md:1).
 
 ### Links
-- HuggingFace Space: [LINK](https://huggingface.co/spaces/PLACEHOLDER/shiftlog-gym)
-- Training run (W&B or CSV): [LINK](https://example.com/training-run)
-- Blog post / video: [LINK](https://example.com/blog-or-video)
+- HuggingFace Space: [ShiftLog-Gym Dashboard](https://huggingface.co/spaces/Chirag0123/shiftlog-gym)
