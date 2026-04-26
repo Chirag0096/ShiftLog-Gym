@@ -1,131 +1,31 @@
-name: "shiftlog-gym"
-version: "0.1.0"
-description: "SRE incident-response RL environment with causal incident chains and persistent shift-log memory. Trains LLMs to write, retrieve, and act on structured memory before resolving causally linked incidents."
-theme: "world_modeling_professional"
-entry_point: "shiftlog_gym.server.app:app"
-tools:
-  - name: "read_shift_log"
-    description: "Search the persistent shift log for prior incident facts before acting."
-    input_schema:
-      type: object
-      properties:
-        query:
-          type: string
-        limit:
-          type: integer
-          minimum: 1
-      required: ["query"]
-  - name: "append_shift_log"
-    description: "Append a structured memory entry to the shift log."
-    input_schema:
-      type: object
-      properties:
-        entry_type:
-          type: string
-        incident_id:
-          type: string
-        service:
-          type: string
-        fact:
-          type: string
-        confidence:
-          type: number
-          minimum: 0
-          maximum: 1
-      required: ["entry_type", "incident_id", "service", "fact", "confidence"]
-  - name: "update_shift_log"
-    description: "Update an existing shift-log entry by memory identifier."
-    input_schema:
-      type: object
-      properties:
-        memory_id:
-          type: string
-        patch:
-          type: string
-        reason:
-          type: string
-      required: ["memory_id", "patch", "reason"]
-  - name: "inspect_service"
-    description: "Inspect the currently active service for owner, runbook, and symptom context."
-    input_schema:
-      type: object
-      properties:
-        service:
-          type: string
-      required: ["service"]
-  - name: "inspect_dependency"
-    description: "Inspect the active service dependency graph."
-    input_schema:
-      type: object
-      properties:
-        service:
-          type: string
-      required: ["service"]
-  - name: "run_diagnostic"
-    description: "Run a named diagnostic command against a service."
-    input_schema:
-      type: object
-      properties:
-        service:
-          type: string
-        diagnostic:
-          type: string
-      required: ["service", "diagnostic"]
-  - name: "apply_mitigation"
-    description: "Apply a mitigation to a service and observe whether symptoms improve."
-    input_schema:
-      type: object
-      properties:
-        service:
-          type: string
-        mitigation:
-          type: string
-      required: ["service", "mitigation"]
-  - name: "resolve_incident"
-    description: "Resolve an incident with an explicit mitigation and machine-checkable root cause."
-    input_schema:
-      type: object
-      properties:
-        incident_id:
-          type: string
-        resolution:
-          type: string
-        root_cause:
-          type: string
-      required: ["incident_id", "resolution", "root_cause"]
-  - name: "handoff_summary"
-    description: "Generate an end-of-shift handoff summary for the next on-call engineer."
-    input_schema:
-      type: object
-      properties: {}
-      required: []
-reward_rubrics:
-  - name: "success"
-    weight: 0.35
-  - name: "recall_before_action"
-    weight: 0.25
-  - name: "memory_write_quality"
-    weight: 0.15
-  - name: "memory_integrity"
-    weight: 0.10
-  - name: "efficiency"
-    weight: 0.05
-  - name: "hallucination"
-    weight: 0.05
-  - name: "noise_resistance"
-    weight: 0.03
-  - name: "handoff_quality"
-    weight: 0.02
-observation_space: "The agent sees only the current incident card, recent local diagnostics, and a partial window of the persistent shift log. Root causes, causal precursor links, and multi-shift dependencies are hidden unless the agent retrieves or records them through tools."
+name: shiftlog-gym
+version: 0.2.0
+description: >
+  RL environment for training LLM agents to manage memory
+  across a simulated SRE on-call shift with causal incidents.
 action_space:
-  - "read_shift_log"
-  - "append_shift_log"
-  - "update_shift_log"
-  - "inspect_service"
-  - "inspect_dependency"
-  - "run_diagnostic"
-  - "apply_mitigation"
-  - "resolve_incident"
-  - "handoff_summary"
-multi_shift_mode: true
-supports_noise_incidents: true
+  type: discrete
+  tools:
+    - read_shift_log
+    - append_shift_log
+    - update_shift_log
+    - handoff_summary
+    - inspect_service
+    - inspect_dependency
+    - run_diagnostic
+    - apply_mitigation
+    - resolve_incident
+observation_space:
+  type: dict
+  keys:
+    - incident_context
+    - shift_log
+    - service_topology
+    - time_context
+reward_range: [-2.0, 1.0]
+max_episode_steps: 30
+tags:
+  - sre
+  - memory
+  - long-horizon
+  - professional-tasks

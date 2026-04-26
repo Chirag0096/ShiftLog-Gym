@@ -101,6 +101,14 @@ async def health():
                 "/tools": internal_get_tools
             }
         )
+        
+        # Add background training status if available
+        status_file = Path(__file__).resolve().parent.parent / "observatory" / "training_status.txt"
+        if status_file.exists():
+            result["training_status"] = status_file.read_text(encoding="utf-8").split("\n")[0]
+            if "..." in result["training_status"]:
+                result["status"] = "training"
+
         _HEALTH_CACHE = result
         _HEALTH_CACHE_TS = now
         status_code = 200 if result["overall"] != "down" else 503

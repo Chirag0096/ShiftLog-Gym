@@ -1,6 +1,6 @@
 """ShiftLog-Gym Observatory — 5-tab Gradio dashboard."""
 from __future__ import annotations
-import json, os, time
+import json, os, time, subprocess, sys
 from pathlib import Path
 import gradio as gr
 import pandas as pd
@@ -196,6 +196,37 @@ def refresh_results():
             load_plot("01_reward_curve.png"),
             load_plot("02_recall_bonus_curve.png"),
             load_plot("03_mttr_comparison.png"))
+
+def get_training_status():
+    """Read background training status from file."""
+    status_file = OBS / "training_status.txt"
+    if not status_file.exists():
+        import torch
+        if torch.cuda.is_available():
+            return "🟢 **Status:** Idle | GPU: " + torch.cuda.get_device_name(0)
+        return "🔴 **Status:** Idle | No GPU detected. Switch Space settings to L4/T4."
+    return status_file.read_text(encoding="utf-8")
+
+def start_hf_training(repo_id):
+    """Spawn run_training.py as a detached background process."""
+    status_file = OBS / "training_status.txt"
+    # Prevent multiple launches
+    if status_file.exists() and "..." in status_file.read_text():
+         return gr.update(interactive=False), "⚠️ Training already in progress!"
+    
+    # Initialize status file
+    status_file.write_text("🚀 Launching training subprocess...", encoding="utf-8")
+    
+    script_path = ROOT / "run_training.py"
+    # Run as a detached subprocess
+    subprocess.Popen(
+        [sys.executable, str(script_path), repo_id],
+        cwd=str(ROOT),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+    return gr.update(interactive=False), "🚀 Training process spawned. Monitor progress below."
 
 # ── Tab 3 ────────────────────────────────────────────────────────────────────
 
@@ -424,6 +455,35 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             hc_btn.click(fn=run_health_check_ui,
                          outputs=[health_hdr, api_md, scen_md, art_md])
 
+        # TAB 6 — Training Lab (New)
+        with gr.Tab("🧪 Training Lab"):
+            gr.Markdown("### 🚀 Space GPU Training Center")
+            with gr.Row():
+                with gr.Column(scale=2):
+                    tr_status = gr.Markdown(value=get_training_status(), label="Process Monitor")
+                    # Auto-refresh status every 2 seconds
+                    gr.Timer(2.0, active=True).tick(fn=get_training_status, outputs=[tr_status])
+                
+                with gr.Column(scale=1):
+                    target_repo = gr.Textbox(
+                        label="HF Model Repository",
+                        value="Chirag0123/shiftlog-gym-qwen-memory-policy",
+                        placeholder="username/repo-name"
+                    )
+                    launch_btn = gr.Button("🚀 Launch Full GRPO Training", variant="primary")
+                    launch_info = gr.Markdown("")
+                    
+            gr.Markdown("""
+            > **Note:** This will run Stage A (SFT), Stage B (GRPO Short), and Stage C (GRPO Full) in the background. 
+            > The Space will remain responsive. Final weights and plots will be pushed to the model repo above.
+            """)
+            
+            launch_btn.click(
+                fn=start_hf_training, 
+                inputs=[target_repo], 
+                outputs=[launch_btn, launch_info]
+            )
+
     # Footer
     gr.HTML("""<div style="text-align:center;padding:20px;color:#64748b;font-size:0.85rem;border-top:1px solid rgba(255,255,255,0.05)">
       ShiftLog-Gym &copy; 2026 · Built for causal memory benchmarking
@@ -433,3 +493,4 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
     # Populate dynamic fields on load instead of using value=fn to avoid reactive loops
     demo.load(fn=system_status_md, outputs=[status_label])
     demo.load(fn=refresh_results, outputs=[t2_banner, t2_cards, img1, img2, img3])
+    # Also reset training status UI on load if it's been a while (optional)
