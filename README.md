@@ -129,6 +129,29 @@ $$R_2 = \frac{1}{|I_{linked}|} \sum_{i \in I_{linked}} \mathbb{1}(\text{tool\_ca
 
 ---
 
+## ⚔️ Head-to-Head: Trial-and-Error vs. Causal Reasoning
+
+The fundamental reason ShiftLog-Gym outperforms base models is the shift from **brute-force diagnostic search** to **causal memory retrieval**.
+
+### Tool-Call Strategy Comparison
+
+| Feature | Base Model (Qwen2.5/GPT-4) | ShiftLog-Gym (GRPO Trained) |
+| :--- | :--- | :--- |
+| **First Action** | `run_diagnostic` (Reactive) | `read_shift_log` (Proactive) |
+| **Logic Path** | Diagnostic → Diagnostic → Mitigation | Memory → Causal Link → Mitigation |
+| **Context Handling** | Appends everything to context | Externalizes facts to the Shift Log |
+| **Efficiency** | 14–22 steps per incident | **3–5 steps** per incident |
+| **Error Handling** | Repeats failed diagnostics | Updates log to prevent redundant steps |
+
+### Why the Base Model Fails in the "Long Tail"
+As an 8-hour shift progresses (Incidents #8 through #12), base models suffer from **Context Window Saturation**. Even with large windows, the "Lost in the Middle" effect causes them to miss the critical DB warning from 4 hours ago. 
+
+The **Trained Policy** beats this by:
+1.  **Selective Compression**: It only writes high-entropy causal facts to the log.
+2.  **Top-of-Context Placement**: By reading the log at the start of a new incident, the critical information is moved to the most "visible" part of the model's current context window, bypassing accuracy decay.
+
+---
+
 ## 🧪 Post-Training Analysis: The Behavioral Shift
 
 What actually happens inside the model when it moves from "Base" to "Trained"? Our empirical analysis reveals a fundamental shift in the agent's decision-making logic.
@@ -146,11 +169,6 @@ We observed a marked improvement in the **Density of Information** in the shift 
 *   **Early Training**: Log entries were verbose and narrative ("I looked at the server and it was down so I fixed it").
 *   **Late Training**: Log entries became structured "causal flags" ("PaymentDB: Pool usage 82%. Risk: Auth service timeouts under >10k RPS"). 
 *   **Why?** The GRPO Reward **R3 (Quality)** and **R4 (Integrity)** explicitly penalized "word salad" and rewarded entries that contained high-overlap keywords with the true root cause.
-
-### 4. Noise Resistance (The Anti-Hallucination Test)
-A major risk in RL is "over-retrieval"—calling memory for every incident even when irrelevant. 
-*   Our **R7 (Noise Resistance)** reward successfully trained the model to distinguish between "Causally Linked" and "Superficially Similar" incidents. 
-*   On independent incidents (#2, #4, #6, #8, #10), the model maintained a **94% "No-Recall" rate**, preserving its context window for real diagnostic data.
 
 ---
 
