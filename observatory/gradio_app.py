@@ -198,35 +198,59 @@ def refresh_results():
             load_plot("03_mttr_comparison.png"))
 
 def get_training_status():
-    """Read background training status from file."""
+    """Read background training status from file with tail-like behavior."""
     status_file = OBS / "training_status.txt"
     if not status_file.exists():
         import torch
-        if torch.cuda.is_available():
-            return "🟢 **Status:** Idle | GPU: " + torch.cuda.get_device_name(0)
-        return "🔴 **Status:** Idle | No GPU detected. Switch Space settings to L4/T4."
-    return status_file.read_text(encoding="utf-8")
-
-def start_hf_training(repo_id):
-    """Spawn run_training.py as a detached background process."""
-    status_file = OBS / "training_status.txt"
-    # Prevent multiple launches
-    if status_file.exists() and "..." in status_file.read_text():
-         return gr.update(interactive=False), "⚠️ Training already in progress!"
+        gpu_info = f" | GPU: {torch.cuda.get_device_name(0)}" if torch.cuda.is_available() else " | ❌ No GPU"
+        return f"🟢 **Status:** Idle {gpu_info}\n\n*Logs will appear here once training starts.*"
     
-    # Initialize status file
-    status_file.write_text("🚀 Launching training subprocess...", encoding="utf-8")
+    try:
+        content = status_file.read_text(encoding="utf-8")
+        # Keep only the last 15 lines for the UI box
+        lines = content.split("\n")
+        display_text = "\n".join(lines[-20:])
+        return f"### 📝 Training Logs (Auto-refresh)\n```text\n{display_text}\n```"
+    except Exception as e:
+        return f"⚠️ Error reading logs: {e}"
+
+def start_hf_training(repo_id, wandb_key):
+    """Spawn run_training.py as a detached background process with environment variables."""
+    status_file = OBS / "training_status.txt"
+    
+    # Check if already running
+    if status_file.exists():
+        current = status_file.read_text(encoding="utf-8")
+        if "..." in current and "Done!" not in current and "ERROR" not in current:
+             return gr.update(interactive=False), "⚠️ Training already in progress!"
+    
+    # Initialize/Clear status file
+    status_file.write_text("🚀 [System] Launching training subprocess...\n", encoding="utf-8")
     
     script_path = ROOT / "run_training.py"
+    
+    # Prepare environment with the provided WandB key
+    env = os.environ.copy()
+    if wandb_key:
+        env["WANDB_API_KEY"] = wandb_key.strip()
+        env["WANDB_MODE"] = "online"
+    else:
+        env["WANDB_MODE"] = "disabled"
+    
     # Run as a detached subprocess
-    subprocess.Popen(
-        [sys.executable, str(script_path), repo_id],
-        cwd=str(ROOT),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True
-    )
-    return gr.update(interactive=False), "🚀 Training process spawned. Monitor progress below."
+    # We pipe stdout/stderr to a log file instead of /dev/null for persistent debugging
+    log_path = OBS / "training_full_log.txt"
+    with open(log_path, "w") as f:
+        subprocess.Popen(
+            [sys.executable, str(script_path), repo_id],
+            cwd=str(ROOT),
+            stdout=f,
+            stderr=subprocess.STDOUT,
+            env=env,
+            start_new_session=True
+        )
+    
+    return gr.update(interactive=False), "✅ Training process spawned successfully!"
 
 # ── Tab 3 ────────────────────────────────────────────────────────────────────
 
@@ -470,17 +494,22 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                         value="Chirag0123/shiftlog-gym-qwen-memory-policy",
                         placeholder="username/repo-name"
                     )
+                    wandb_input = gr.Textbox(
+                        label="Weights & Biases API Key (Optional)",
+                        placeholder="Paste key from wandb.ai/settings",
+                        type="password"
+                    )
                     launch_btn = gr.Button("🚀 Launch Full GRPO Training", variant="primary")
                     launch_info = gr.Markdown("")
                     
             gr.Markdown("""
-            > **Note:** This will run Stage A (SFT), Stage B (GRPO Short), and Stage C (GRPO Full) in the background. 
-            > The Space will remain responsive. Final weights and plots will be pushed to the model repo above.
+            > **Note:** If you provide a WandB key, you can track real-time charts at [wandb.ai](https://wandb.ai). 
+            > The Space will upload final weights and plots to your model repo automatically.
             """)
             
             launch_btn.click(
                 fn=start_hf_training, 
-                inputs=[target_repo], 
+                inputs=[target_repo, wandb_input], 
                 outputs=[launch_btn, launch_info]
             )
 
