@@ -53,13 +53,13 @@ body,.gradio-container{font-family:"Inter",sans-serif!important;background:#0b0f
 
 def _api(method: str, path: str, body=None):
     """
-    Unified API caller. Uses direct function calls if HAS_INTERNAL=True 
-     and API_BASE is localhost, otherwise falls back to httpx.
+    Unified API caller. Uses direct function calls if HAS_INTERNAL=True
+    (ignoring API_BASE to avoid external network overhead/deadlocks).
     """
     start = time.monotonic()
     
-    # Try direct call first if on localhost to avoid deadlocks
-    if HAS_INTERNAL and ("localhost" in API_BASE or "127.0.0.1" in API_BASE):
+    # ALWAYS use internal functions if available when running in the same process
+    if HAS_INTERNAL:
         try:
             if path == "/reset":
                 data = internal_reset(body)
@@ -78,7 +78,7 @@ def _api(method: str, path: str, body=None):
             ms = round((time.monotonic() - start) * 1000)
             return {}, ms, str(exc)
 
-    # Fallback to HTTP
+    # Fallback to HTTP (only if internal functions are not available)
     try:
         fn = httpx.post if method == "POST" else httpx.get
         kw = {"timeout": TIMEOUT}
@@ -424,41 +424,8 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             hc_btn.click(fn=run_health_check_ui,
                          outputs=[health_hdr, api_md, scen_md, art_md])
 
-    # Diagnostic area: reports whether CSS loaded and tab clicks
-    diag_html = '''<div id="diag" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:rgba(0,0,0,0.6);color:#fff;padding:8px 12px;border-radius:8px;font-size:0.9rem">
-  <div><strong>UI Diagnostics</strong></div>
-  <div id="diag-css">CSS: checking...</div>
-  <div id="diag-last">Last tab clicked: none</div>
-</div>
-<script>
-  (function(){
-    function setText(id, txt){
-      var el = document.getElementById(id); if(el) el.textContent = txt;
-    }
-    var tablist = document.querySelector('.gradio-container [role="tablist"]');
-    if(tablist){
-      var cs = window.getComputedStyle(tablist);
-      var pe = cs.pointerEvents || '';
-      var zi = cs.zIndex || '';
-      setText('diag-css', 'CSS: OK (pointer-events='+pe+', z-index='+zi+')');
-      var tabs = document.querySelectorAll('.gradio-container [role="tab"]');
-      tabs.forEach(function(t,i){
-        t.addEventListener('click', function(ev){
-          var txt = t.textContent || t.innerText || ('tab-'+i);
-          setText('diag-last', 'Last tab clicked: '+txt.trim());
-        });
-      });
-    } else {
-      setText('diag-css', 'CSS: tablist element not found (retrying...)');
-      setTimeout(function(){
-        var tl = document.querySelector('.gradio-container [role="tablist"]');
-        if(tl) {
-          setText('diag-css', 'CSS: OK (found after delay)');
-        } else {
-          setText('diag-css', 'CSS: tablist still not found');
-        }
-      }, 2000);
-    }
-  })();
-</script>'''
-    gr.HTML(diag_html)
+
+    # Footer
+    gr.HTML("""<div style="text-align:center;padding:20px;color:#64748b;font-size:0.85rem;border-top:1px solid rgba(255,255,255,0.05)">
+      ShiftLog-Gym &copy; 2026 · Built for causal memory benchmarking
+    </div>""")
