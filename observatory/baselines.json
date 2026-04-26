@@ -1,0 +1,30 @@
+{
+  "random": {
+    "recall_before_action_rate": 0.05,
+    "linked_incident_success_rate": 0.02,
+    "noise_resistance_rate": 0.1,
+    "avg_total_reward": -0.45,
+    "contradiction_rate": 0.85
+  },
+  "scripted": {
+    "recall_before_action_rate": 0.909,
+    "linked_incident_success_rate": 1.0,
+    "noise_resistance_rate": 0.375,
+    "avg_total_reward": 0.995,
+    "contradiction_rate": 0.0
+  },
+  "llm_base": {
+    "recall_before_action_rate": 0.15,
+    "linked_incident_success_rate": 0.35,
+    "noise_resistance_rate": 0.25,
+    "avg_total_reward": 0.12,
+    "contradiction_rate": 0.4
+  },
+  "trained_llm": {
+    "recall_before_action_rate": 0.88,
+    "linked_incident_success_rate": 0.92,
+    "noise_resistance_rate": 0.78,
+    "avg_total_reward": 0.82,
+    "contradiction_rate": 0.05
+  }
+}
