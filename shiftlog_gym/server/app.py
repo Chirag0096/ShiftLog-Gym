@@ -1,16 +1,58 @@
+"""ShiftLog-Gym FastAPI server — with middleware, health check, and /health endpoint."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 from ..models import ShiftLogAction
 from ..trl_env import ShiftLogToolEnv
+from .middleware import setup_middleware
 
-app = FastAPI(title="ShiftLog-Gym", version="0.1.0")
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="ShiftLog-Gym",
+    version="0.2.0",
+    description="OpenEnv-compliant SRE incident-memory training environment.",
+)
+
+# Attach error-resilient middleware
+setup_middleware(app)
+
 session = ShiftLogToolEnv()
 
 
+# ---------------------------------------------------------------------------
+# Startup — run health check and write health_status.json
+# ---------------------------------------------------------------------------
+@app.on_event("startup")
+async def run_health_check() -> None:
+    """Run all health checks on startup and write results to health_status.json."""
+    import asyncio
+
+    async def _deferred() -> None:
+        # Wait briefly so the server is fully ready before hitting /reset
+        await asyncio.sleep(3)
+        try:
+            from ..diagnostics.health_check import run_full_health_check
+            results = run_full_health_check(base_url="http://localhost:7860")
+            icon = {"ok": "✅", "degraded": "⚠️", "down": "❌"}.get(results["overall"], "❓")
+            logger.info("%s Startup health check: %s", icon, results["overall"])
+        except Exception as exc:
+            logger.warning("Health check failed to run: %s", exc)
+
+    asyncio.create_task(_deferred())
+
+
+# ---------------------------------------------------------------------------
+# Core Environment Endpoints
+# ---------------------------------------------------------------------------
+
 @app.post("/reset")
 def reset(payload: dict | None = None):
+    """Reset the environment to a fresh episode."""
     global session
     payload = payload or {}
     rollout_mode = payload.get("rollout_mode", "short")
@@ -31,6 +73,7 @@ def reset(payload: dict | None = None):
 
 @app.post("/step")
 def step(action: ShiftLogAction):
+    """Execute a tool action in the current episode."""
     tool = getattr(session, action.tool, None)
     if tool is None or action.tool.startswith("_"):
         observation = session.as_observation()
@@ -44,21 +87,36 @@ def step(action: ShiftLogAction):
 
 @app.get("/state")
 def state():
+    """Return current environment state."""
     return session.get_info()
 
 
 @app.get("/tools")
 def tools():
+    """Return list of valid tool names."""
     return {
         "tools": [
-            "read_shift_log",
-            "append_shift_log",
-            "update_shift_log",
-            "inspect_service",
-            "inspect_dependency",
-            "run_diagnostic",
-            "apply_mitigation",
-            "resolve_incident",
-            "handoff_summary",
+            "read_shift_log", "append_shift_log", "update_shift_log",
+            "inspect_service", "inspect_dependency", "run_diagnostic",
+            "apply_mitigation", "resolve_incident", "handoff_summary",
         ]
     }
+
+
+# ---------------------------------------------------------------------------
+# Health Endpoint (Deliverable 4)
+# ---------------------------------------------------------------------------
+
+@app.get("/health")
+def health():
+    """Run full health check and return JSON status. Used by Gradio dashboard."""
+    try:
+        from ..diagnostics.health_check import run_full_health_check
+        result = run_full_health_check(base_url="http://localhost:7860")
+        status_code = 200 if result["overall"] != "down" else 503
+        return JSONResponse(content=result, status_code=status_code)
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"overall": "down", "error": str(exc)},
+        )
