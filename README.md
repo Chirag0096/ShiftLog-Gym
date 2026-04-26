@@ -49,29 +49,6 @@ ShiftLog-Gym simulates a complete **8-hour SRE on-call shift** across 12 sequent
 
 ![Architecture Flow](plots/architecture_flow.jpg)
 
-### The Causal Chain
-
-```mermaid
-graph LR
-    subgraph "Shift Start"
-    I1[#1: DB Pool 80%] --> I7[#7: Auth Cascade]
-    I3[#3: OOM Logged] --> I9[#9: OOM Recurrence]
-    I5[#5: Config Drift] --> I11[#11: Same Config Drift]
-    end
-    
-    subgraph "Noise (Anti-Hallucination)"
-    I2[#2: Rate Limit]
-    I4[#4: Slow DB]
-    I6[#6: Cert Expiry]
-    I8[#8: Index Corrupt]
-    I10[#10: DB v2 Event]
-    end
-    
-    I7 -.-> R1[Resolution in 3-5 steps]
-    I1 -- "No Memory" --> I7 -.-> R2[Brute force 25 steps]
-```
-
----
 
 ## 🏆 Reward Architecture
 
