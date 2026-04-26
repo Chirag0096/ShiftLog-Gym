@@ -205,7 +205,7 @@ def trigger_training(hf_repo):
 
 
 # Initialize Interface structure
-with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
+with gr.Blocks(title="ShiftLog Observatory Explorer") as demo:
     
     # Header Module
     with gr.Column(elem_classes="glass-header"):
@@ -227,7 +227,6 @@ with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
                     curve_plot = gr.Plot(label="")
                 
                 curve_button.click(fn=plot_training, inputs=[stage_choice], outputs=[curve_plot])
-                demo.load(fn=plot_training, inputs=[stage_choice], outputs=[curve_plot])
 
         with gr.Tab("📊 Results & Evidence"):
             with gr.Column(elem_classes="glass-panel"):
@@ -259,11 +258,6 @@ with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
                     inputs=[],
                     outputs=[plot_img1, plot_img2, plot_img3, plots_status, metadata_display]
                 )
-                demo.load(
-                    fn=refresh_plots_fn,
-                    inputs=[],
-                    outputs=[plot_img1, plot_img2, plot_img3, plots_status, metadata_display]
-                )
 
         with gr.Tab("🏆 Baselines & Leaderboard"):
             with gr.Column(elem_classes="glass-panel"):
@@ -280,7 +274,6 @@ with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
                     return meta, table
                 
                 baseline_button.click(fn=refresh_leaderboard, inputs=None, outputs=[metadata_label, baseline_table])
-                demo.load(fn=refresh_leaderboard, inputs=None, outputs=[metadata_label, baseline_table])
 
         with gr.Tab("🔬 Held-out Evaluation"):
             with gr.Column(elem_classes="glass-panel"):
@@ -292,7 +285,6 @@ with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
                 eval_table = gr.Dataframe(label="")
                 
                 eval_button.click(fn=load_eval_table, inputs=[eval_stage_choice], outputs=[eval_table])
-                demo.load(fn=load_eval_table, inputs=[eval_stage_choice], outputs=[eval_table])
 
         with gr.Tab("⚙️ Engine & Execute Training"):
             with gr.Column(elem_classes="glass-panel"):
@@ -319,4 +311,4 @@ with gr.Blocks(title="ShiftLog Observatory Explorer", css=custom_css) as demo:
                 refresh_btn.click(fn=get_training_status, inputs=[], outputs=[status_block])
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(css=custom_css)
