@@ -354,7 +354,7 @@ border-radius:12px;padding:20px;margin-bottom:12px">
 <p style="color:#94a3b8;margin:0;line-height:1.7">Incident #7 is causally linked to a precursor from
 the previous shift — but only if the agent <strong style="color:#38bdf8">reads the shift log first.</strong></p>
 </div>""")
-                    status_label = gr.Markdown(value=system_status_md)
+                    status_label = gr.Markdown(value="🟡 **Status:** Initializing...")
                     demo_btn = gr.Button("▶  Start Demo Episode", variant="primary")
                     next_btn = gr.Button("⏭  Next Step (1/5)", interactive=False)
                     step_state = gr.State(0)
@@ -370,8 +370,8 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
 
         # TAB 2 — Training Results
         with gr.Tab("📊 Training Results"):
-            t2_banner = gr.Markdown(value=training_banner)
-            t2_cards  = gr.HTML(value=metric_cards_html)
+            t2_banner = gr.Markdown(value="⌛ Loading results...")
+            t2_cards  = gr.HTML(value="<div>Loading metrics...</div>")
             gr.HTML('''<div style="margin:8px 0">
 <a href="https://wandb.ai/chiragaswal2/shiftlog-gym" target="_blank"
    style="color:#818cf8;text-decoration:none;font-weight:600">📊 View WandB Run →</a></div>''')
@@ -424,8 +424,12 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             hc_btn.click(fn=run_health_check_ui,
                          outputs=[health_hdr, api_md, scen_md, art_md])
 
-
     # Footer
     gr.HTML("""<div style="text-align:center;padding:20px;color:#64748b;font-size:0.85rem;border-top:1px solid rgba(255,255,255,0.05)">
       ShiftLog-Gym &copy; 2026 · Built for causal memory benchmarking
     </div>""")
+
+    # --- Initialization ---
+    # Populate dynamic fields on load instead of using value=fn to avoid reactive loops
+    demo.load(fn=system_status_md, outputs=[status_label])
+    demo.load(fn=refresh_results, outputs=[t2_banner, t2_cards, img1, img2, img3])
