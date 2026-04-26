@@ -361,6 +361,21 @@ def run_full_health_check(base_url: str = "http://localhost:7860",
     """
     import datetime
 
+    # If call_direct not provided, try to use internal core functions if available
+    if not call_direct:
+        try:
+            from shiftlog_gym.server.core import (
+                internal_reset, internal_step, internal_get_state, internal_get_tools
+            )
+            call_direct = {
+                "/reset": internal_reset,
+                "/step": internal_step,
+                "/state": internal_get_state,
+                "/tools": internal_get_tools
+            }
+        except ImportError:
+            pass
+
     api_result = check_api_health(base_url, call_direct=call_direct)
     scenario_result = validate_scenarios()
     artifact_result = check_training_artifacts()

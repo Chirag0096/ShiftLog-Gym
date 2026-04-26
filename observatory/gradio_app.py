@@ -14,7 +14,7 @@ TIMEOUT  = 10.0
 
 # Attempt to import internal logic for direct calls (bypasses HTTP deadlocks)
 try:
-    from shiftlog_gym.server.app import (
+    from shiftlog_gym.server.core import (
         internal_reset, internal_step, internal_get_state, internal_get_tools
     )
     HAS_INTERNAL = True
