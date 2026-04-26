@@ -180,9 +180,11 @@ def load_plots_tab():
 STATUS_FILE = OBS_ROOT / "training_status.txt"
 
 def get_training_status():
+    import datetime
+    now = datetime.datetime.now().strftime('%H:%M:%S')
     if not STATUS_FILE.exists():
-        return "Not Started. Awaiting execution."
-    return STATUS_FILE.read_text(encoding="utf-8").strip()
+        return f"[{now}] Not Started. Awaiting execution."
+    return f"[{now}] {STATUS_FILE.read_text(encoding='utf-8').strip()}"
 
 def trigger_training(hf_repo):
     import subprocess
