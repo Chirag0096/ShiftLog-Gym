@@ -177,61 +177,22 @@ def load_plots_tab():
     return img1, img2, img3, status
 
 # ----------------- Automated Training Execution Logic -----------------
-training_status_msg = "Not Started. Awaiting execution."
-
-def start_training_pipeline_background(hf_repo: str):
-    global training_status_msg
-    try:
-        training_status_msg = "Initializing..."
-        import sys
-        sys.path.append(str(ROOT))
-        
-        import torch
-        if not torch.cuda.is_available():
-            training_status_msg = "ERROR: No CUDA GPU available. Go to Space Settings → Hardware and select Nvidia T4 or L4."
-            return
-
-        from train.colab_training_pipeline import ColabTrainingPipeline
-
-        training_status_msg = "Loading ColabTrainingPipeline & Authenticating..."
-        pipeline = ColabTrainingPipeline()
-        pipeline.authenticate()
-
-        training_status_msg = "Loading Qwen Model into memory (4-bit BF16)..."
-        pipeline.load_model()
-
-        training_status_msg = "Running Stage A (SFT Format Warmup)..."
-        pipeline.run_stage_a()
-
-        training_status_msg = "Running Stage B (GRPO Short Rollout — 200 steps)..."
-        pipeline.run_stage_grpo(pipeline.stage_b)
-
-        training_status_msg = "Running Stage C (GRPO Full Rollout — 300 steps)..."
-        pipeline.run_stage_grpo(pipeline.stage_c)
-
-        training_status_msg = "Evaluating & Summarizing Results..."
-        pipeline.evaluate_and_write()
-
-        if hf_repo:
-            training_status_msg = f"Uploading weights to HF Model Hub at {hf_repo}..."
-            pipeline.upload_to_hf(repo_id=hf_repo)
-
-        training_status_msg = "✅ Done! Training successfully completed. Refresh the Results tab to see plots."
-    except Exception as e:
-        training_status_msg = f"ERROR: {str(e)}"
-
-def trigger_training(hf_repo):
-    global training_status_msg
-    if any(kw in training_status_msg for kw in ["Running", "Loading", "Evaluating", "Uploading"]):
-        return training_status_msg
-    
-    t = threading.Thread(target=start_training_pipeline_background, args=(hf_repo,), daemon=True)
-    t.start()
-    return "🚀 Training job submitted to background daemon. Click 'Check Status' to monitor progress."
+STATUS_FILE = OBS_ROOT / "training_status.txt"
 
 def get_training_status():
-    global training_status_msg
-    return training_status_msg
+    if not STATUS_FILE.exists():
+        return "Not Started. Awaiting execution."
+    return STATUS_FILE.read_text(encoding="utf-8").strip()
+
+def trigger_training(hf_repo):
+    import subprocess
+    status = get_training_status()
+    if any(kw in status for kw in ["Running", "Loading", "Evaluating", "Uploading", "Initializing"]):
+        return status
+    
+    STATUS_FILE.write_text("Preparing decoupled training subprocess...", encoding="utf-8")
+    subprocess.Popen(["python", "run_training.py", str(hf_repo or "")])
+    return "🚀 Training job submitted to detached subprocess. Click 'Check Status' to monitor progress."
 
 
 # Initialize Interface structure
