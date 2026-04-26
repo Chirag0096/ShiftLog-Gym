@@ -322,8 +322,29 @@ with gr.Blocks(title="ShiftLog Observatory Explorer") as demo:
                     start_btn = gr.Button("🔥 Run Full PEFT/GRPO Train Pipeline", elem_classes="btn-primary")
                     refresh_btn = gr.Button("🔄 Check Status")
                 
+                gr.Markdown("---")
+                gr.Markdown("### 🔍 Subprocess Debug Log")
+                gr.Markdown("_Shows raw stdout/stderr from the training subprocess — useful for diagnosing hangs._")
+                
+                log_display = gr.Textbox(
+                    label="training_subprocess.log (last 3000 chars)",
+                    value="",
+                    interactive=False,
+                    lines=12,
+                )
+                view_log_btn = gr.Button("📋 View Subprocess Log")
+                
+                def read_subprocess_log():
+                    log_path = OBS_ROOT / "training_subprocess.log"
+                    if not log_path.exists():
+                        return "No log file yet — click '🔥 Run Full PEFT/GRPO Train Pipeline' first."
+                    content = log_path.read_text(encoding="utf-8", errors="replace")
+                    return content[-3000:] if len(content) > 3000 else content
+                
                 start_btn.click(fn=trigger_training, inputs=[hf_upload_repo], outputs=[status_block])
                 refresh_btn.click(fn=get_training_status, inputs=[], outputs=[status_block])
+                view_log_btn.click(fn=read_subprocess_log, inputs=[], outputs=[log_display])
 
 if __name__ == "__main__":
     demo.launch(css=custom_css)
+
