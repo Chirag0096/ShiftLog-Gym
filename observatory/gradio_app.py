@@ -286,6 +286,11 @@ def run_health_check_ui():
 
 with gr.Blocks(title="ShiftLog-Gym Observatory") as demo:
 
+    # Inject custom CSS into the page so styles apply even when the app is mounted
+    # (HuggingFace Spaces mounts the Blocks app and does not call launch(),
+    # so passing `css` to launch() may not be effective there).
+    gr.HTML(f"""<style>{custom_css}</style>""")
+
     gr.HTML("""<div style="text-align:center;padding:28px 0 8px">
 <h1 style="background:linear-gradient(90deg,#38bdf8,#818cf8,#c084fc);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
