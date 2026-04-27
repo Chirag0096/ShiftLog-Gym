@@ -521,18 +521,18 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             
             with gr.Row():
                 with gr.Column(scale=1):
-                    gr.Markdown("### Interactive Training Curves")
-                    plot_reward = gr.Plot(label="Reward Progression")
-                    plot_recall = gr.Plot(label="Recall Rate (R2)")
+                    gr.Markdown("### 🎯 Live Reward & Recall")
+                    plot_reward = gr.Plot(label="Cumulative Shift Reward")
+                    plot_recall = gr.Plot(label="Causal Recall Rate (R2)")
                 with gr.Column(scale=1):
-                    gr.Markdown("### MTTR Comparison")
-                    plot_mttr = gr.Plot(label="MTTR Improvement")
+                    gr.Markdown("### ⚡ Operational Efficiency")
+                    plot_mttr = gr.Plot(label="MTTR Efficiency Delta")
                     
-            gr.Markdown("---\n### Historical Performance Snapshots")
+            gr.Markdown("---\n### 📊 Historical Performance Snapshots (Static)")
             with gr.Row():
-                img1 = gr.Image(value=load_plot("01_reward_curve.png"), label="Reward Curve")
-                img2 = gr.Image(value=load_plot("02_recall_bonus_curve.png"), label="Recall Rate")
-                img3 = gr.Image(value=load_plot("03_mttr_comparison.png"), label="MTTR Comparison")
+                img1 = gr.Image(value=load_plot("train_loss.png"), label="Optimization Loss")
+                img2 = gr.Image(value=load_plot("train_accuracy.png"), label="Tool Selection Accuracy")
+                img3 = gr.Image(value=load_plot("global_step.png"), label="Model Convergence")
             
             ref_btn = gr.Button("🔄 Refresh Results", variant="secondary")
             ref_btn.click(fn=refresh_results, outputs=[t2_banner, t2_cards, plot_reward, plot_recall, plot_mttr, img1, img2, img3])
