@@ -545,12 +545,9 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             Traditional LLMs suffer from **Context Drift**—they forget the morning's root cause by the time the afternoon symptoms arrive.
             
             ### Causal Flow of an Incident Shift
-            """)
             
-            gr.HTML("""
-            <div class="glass" style="margin: 20px 0; padding: 20px;">
-              <pre class="mermaid" style="background:transparent; color:white; text-align:center;">
-              graph TD
+            ```mermaid
+            graph TD
                 subgraph Shift_1 ["Shift 1: Precursor (Yesterday)"]
                     P1["Incident A: Auth Latency"] -->|Root Cause| RC1["DB Pool Exhaustion"]
                     RC1 -->|tool: append_shift_log| L[(📜 Global Shift Log)]
@@ -572,15 +569,8 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                 style RC1 fill:#1e1b4b,stroke:#6366f1,color:#fff
                 style S fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#fff
                 style E fill:#7f1d1d,stroke:#f87171,stroke-width:2px,color:#fff
-              </pre>
-            </div>
-            <script type="module">
-              import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-              mermaid.initialize({ startOnLoad: true, theme: 'dark' });
-            </script>
-            """)
-            
-            gr.Markdown("""
+            ```
+
             ### The GRPO Solution
             Our model is trained using **Group Relative Policy Optimization** to penalize "Vibe Coding" (acting without reading) 
             and reward "Causal Recall" (linking symptoms to prior log entries).
