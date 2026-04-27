@@ -369,6 +369,11 @@ _REWARD_ROWS = "".join(
         ("Handoff Quality","2%","Structured shift handoff summary"),
     ]
 )
+_FAMILY_PILLS = "".join(
+    f'<span style="background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);'
+    f'border-radius:8px;padding:8px 14px;font-size:.9rem;color:#e2e8f0">{f}</span>'
+    for f in ["db_pool","auth_cascade","oom_regression","feature_flag","network_partition","config_drift"]
+)
 STORY_HTML = f"""
 <h2 style="background:linear-gradient(90deg,#38bdf8,#818cf8);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent">The Memory Gap in Frontier AI</h2>
@@ -392,11 +397,6 @@ ShiftLog-Gym fills this gap with a verifiable, causal SRE environment and 8 grou
 <h3 style="color:#818cf8;margin-top:32px">6 Scenario Families</h3>
 <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px">{_FAMILY_PILLS}</div>
 """
-_FAMILY_PILLS = "".join(
-    f'<span style="background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);'
-    f'border-radius:8px;padding:8px 14px;font-size:.9rem;color:#e2e8f0">{f}</span>'
-    for f in ["db_pool","auth_cascade","oom_regression","feature_flag","network_partition","config_drift"]
-)
 
 # ── Tab 4 ────────────────────────────────────────────────────────────────────
 
