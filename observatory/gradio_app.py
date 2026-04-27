@@ -571,8 +571,15 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                     gpu_info_box = gr.Textbox(
                         label="GPU Status",
                         value=_get_gpu_info(),
-                        interactive=False,
+                        interactive=True,
                         lines=3,
+                    )
+
+                    repo_id_input = gr.Textbox(
+                        label="Target HF Repository ID",
+                        value="Chirag0123/shiftlog-gym-qwen-memory-policy",
+                        placeholder="username/repo-name",
+                        interactive=True
                     )
 
                 with gr.Column(scale=2):
@@ -585,25 +592,30 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                         max_lines=20,
                     )
 
-            # Progress metrics row
+            # Progress metrics row (now editable as requested)
             with gr.Row():
-                metric_step = gr.Number(label="Steps Completed", value=0, interactive=False)
-                metric_recall = gr.Number(label="Recall Rate (R2)", value=0.0, interactive=False)
-                metric_reward = gr.Number(label="Total Reward", value=0.0, interactive=False)
+                metric_step = gr.Number(label="Steps Completed", value=0, interactive=True)
+                metric_recall = gr.Number(label="Recall Rate (R2)", value=0.0, interactive=True)
+                metric_reward = gr.Number(label="Total Reward", value=0.0, interactive=True)
 
-            # WandB + Model links
+            # WandB + Model links (now editable as requested)
             with gr.Row():
-                wandb_link = gr.Textbox(label="WandB Run URL", value="", interactive=False)
-                model_link = gr.Textbox(label="Trained Model URL", value="", interactive=False)
+                wandb_link = gr.Textbox(label="WandB Run URL", value="", interactive=True)
+                model_link = gr.Textbox(label="Trained Model URL", value="", interactive=True)
 
             # ─── Callbacks ──────────────────────────────────────────────────────────
-            def handle_start_training():
+            def handle_start_training(repo_id):
                 if os.environ.get("TRAIN_ENABLED", "0") != "1":
                     return (
                         "<div style='color:#f87171; padding:10px; border:1px solid #f87171; border-radius:8px;'>❌ <b>Training Blocked:</b> Set <code>TRAIN_ENABLED=1</code> in Space Settings → Variables & Secrets, then restart the Space.</div>",
                         "ERROR: Environment variable TRAIN_ENABLED is not set to '1'.",
                         0, 0.0, 0.0, "", ""
                     )
+
+                # Update target repo in daemon if provided
+                import train.space_training_daemon as daemon
+                if repo_id:
+                    daemon.MODEL_REPO = repo_id.strip()
 
                 state = get_state()
                 if state["status"] == "running":
@@ -639,7 +651,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
 
             start_btn.click(
                 fn=handle_start_training,
-                inputs=[],
+                inputs=[repo_id_input],
                 outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, wandb_link, model_link],
             )
 
