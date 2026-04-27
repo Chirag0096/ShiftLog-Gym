@@ -46,7 +46,7 @@ def _update(**kwargs):
         if "message" in kwargs:
             msg = kwargs["message"]
             timestamp = datetime.now().strftime("%H:%M:%S")
-            _state["log_lines"] = (_state["log_lines"] + [f"[{timestamp}] {msg}"]) Spanish-50:]
+            _state["log_lines"] = (_state["log_lines"] + [f"[{timestamp}] {msg}"])[-50:]
             print(f"[DAEMON] {msg}") # Also print to container logs
 
 
