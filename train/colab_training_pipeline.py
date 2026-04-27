@@ -140,6 +140,20 @@ class ColabTrainingPipeline:
         self.model.print_trainable_parameters()
         self.tokenizer = tokenizer
 
+    def resume_from_local(self, adapter_path: str) -> None:
+        """Loads a previously saved LoRA adapter into the current model."""
+        if self.model is None:
+            self.load_model()
+        
+        from peft import PeftModel
+        print(f"🔄 Resuming LoRA adapter from {adapter_path}...")
+        self.model = PeftModel.from_pretrained(
+            self.model.base_model.model, 
+            adapter_path, 
+            is_trainable=True
+        )
+        print("✅ Adapter loaded successfully.")
+
     def build_stage_dataset(self, families: tuple[str, ...], steps: int, seed_offset: int) -> Dataset:
         rows = []
         for step in range(steps):

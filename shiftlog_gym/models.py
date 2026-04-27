@@ -40,6 +40,7 @@ if BaseModel is None:
         reward_breakdown: dict[str, float]
         recall_before_action_rate: float
         linked_incident_success_rate: float
+        vibe_coding_ratio: float = 0.0
         active_incident_id: str | None = None
         active_service: str | None = None
         memory_count: int = 0
@@ -71,6 +72,7 @@ else:
         reward_breakdown: dict[str, float]
         recall_before_action_rate: float
         linked_incident_success_rate: float
+        vibe_coding_ratio: float = 0.0
         active_incident_id: str | None = None
         active_service: str | None = None
         memory_count: int = 0

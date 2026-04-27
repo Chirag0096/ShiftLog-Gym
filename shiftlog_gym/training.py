@@ -135,6 +135,7 @@ def summarize_episode(simulator: ShiftLogSimulator, episode_name: str, split: st
         "R_hallucination": state.reward_breakdown.get("R_hallucination", 0.0),
         "recall_before_action_rate": state.recall_before_action_rate,
         "linked_incident_success_rate": state.linked_incident_success_rate,
+        "vibe_coding_ratio": state.vibe_coding_ratio,
         "memory_precision": compute_memory_precision(memory_events),
         "contradiction_rate": compute_contradiction_rate(memory_events),
         "bad_write_rate": compute_bad_write_rate(memory_events),
@@ -301,6 +302,7 @@ def summarize_baseline(rows: list[dict[str, Any]]) -> dict[str, float]:
     numeric_keys = [
         "recall_before_action_rate",
         "linked_incident_success_rate",
+        "vibe_coding_ratio",
         "noise_resistance_rate",
         "weighted_reward",
         "contradiction_rate",

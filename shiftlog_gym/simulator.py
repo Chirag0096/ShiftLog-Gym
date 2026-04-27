@@ -104,6 +104,7 @@ class ShiftLogSimulator:
         self.reward_breakdown: dict[str, float] = self._empty_reward_breakdown()
         self.total_reward = 0.0
         self._memory_counter = 0
+        self._current_incident_read = False
 
     @property
     def active_incident(self) -> RuntimeIncident | None:
@@ -128,6 +129,7 @@ class ShiftLogSimulator:
         self.done = False
         self.last_handoff_summary = ""
         self._memory_counter = 0
+        self._current_incident_read = False
         self.metrics = EpisodeMetrics()
         self.episode_state = EpisodeState(scenario=self.scenario)
         self.reward_breakdown = self._empty_reward_breakdown()
@@ -183,15 +185,9 @@ class ShiftLogSimulator:
             "matched_incident_ids": [entry.incident_id for entry in matches],
         }
         self._record_tool("read_shift_log", message, {"query": query, "limit": limit}, metadata=metadata)
-        self.episode_state.read_queries.append(
-            ReadQuery(
-                timestamp=self.episode_state.step_count,
-                incident_id=incident.incident_id if incident else None,
-                query=query,
-                results=rendered,
-                metadata=metadata,
             )
         )
+        self._current_incident_read = True
         return message
 
     def append_shift_log(
@@ -399,6 +395,13 @@ class ShiftLogSimulator:
 
     def get_state(self) -> ShiftLogStateModel:
         incident = self.active_incident
+        recall_before_action_rate = self.recall_before_action_rate()
+        linked_success_rate = self.linked_incident_success_rate()
+        
+        vibe_ratio = 0.0
+        if self.metrics.action_on_linked_count > 0:
+            vibe_ratio = self.metrics.blind_action_count / self.metrics.action_on_linked_count
+            
         return ShiftLogStateModel(
             shift_id=self.shift_id,
             scenario_family=self.scenario.family if self.scenario else "unknown",
@@ -406,8 +409,9 @@ class ShiftLogSimulator:
             done=self.done,
             total_reward=round(self.total_reward, 4),
             reward_breakdown={key: round(value, 4) for key, value in self.reward_breakdown.items()},
-            recall_before_action_rate=round(self.recall_before_action_rate(), 4),
-            linked_incident_success_rate=round(self.linked_incident_success_rate(), 4),
+            recall_before_action_rate=round(recall_before_action_rate, 4),
+            linked_incident_success_rate=round(linked_success_rate, 4),
+            vibe_coding_ratio=round(vibe_ratio, 4),
             active_incident_id=incident.incident_id if incident else None,
             active_service=incident.service if incident else None,
             memory_count=len(self.episode_state.shift_log_entries) if self.episode_state else 0,
@@ -478,6 +482,13 @@ class ShiftLogSimulator:
             self.metrics.recall_linked_total += 1
             if result and "No relevant shift-log entries" not in result:
                 self.metrics.recall_linked_success += 1
+        
+        # Track "Vibe Coding" (Blind actions on linked incidents)
+        if incident and incident.linked_to and tool_name in ["apply_mitigation", "run_diagnostic", "resolve_incident"]:
+            self.metrics.action_on_linked_count += 1
+            if not self._current_incident_read:
+                self.metrics.blind_action_count += 1
+
         self._refresh_scores()
 
     def _refresh_scores(self) -> None:
@@ -489,6 +500,7 @@ class ShiftLogSimulator:
 
     def _next_incident(self) -> None:
         self.current_index += 1
+        self._current_incident_read = False
         if self.current_index >= len(self.incidents):
             self.done = True
             if self.episode_state:

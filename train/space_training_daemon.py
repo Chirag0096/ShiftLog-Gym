@@ -89,21 +89,30 @@ def run_training() -> None:
         _setup_env()
         _authenticate()
         
+        # 0. Check for existing progress on Hub (Resume logic)
+        resumed_stage = _check_hub_progress()
+        if resumed_stage:
+            _update(message=f"🔄 Resuming training from {resumed_stage}...")
+        
         # 1. Stage A
-        _run_stage_a()
-        _incremental_upload("stage_a")
+        if not resumed_stage or resumed_stage == "init":
+            _run_stage_a()
+            _incremental_upload("stage_a")
         
         # 2. Stage B
-        _run_stage_b()
-        _incremental_upload("stage_b")
+        if not resumed_stage in ["stage_b", "stage_c", "eval", "complete"]:
+            _run_stage_b()
+            _incremental_upload("stage_b")
         
         # 3. Stage C
-        _run_stage_c()
-        _incremental_upload("stage_c") # Final LoRA adapter pushed BEFORE eval
+        if not resumed_stage in ["stage_c", "eval", "complete"]:
+            _run_stage_c()
+            _incremental_upload("stage_c") # Final LoRA adapter pushed BEFORE eval
         
         # 4. Evaluation & Plots
-        _run_evaluation()
-        _generate_plots()
+        if not resumed_stage in ["eval", "complete"]:
+            _run_evaluation()
+            _generate_plots()
         
         # 5. Final Sync
         _upload_to_hub()
@@ -145,6 +154,51 @@ def _authenticate() -> None:
     if not hf_token:
         raise RuntimeError("HF_TOKEN secret not set. Go to Space Settings → Variables and secrets.")
     login(token=hf_token)
+
+def _check_hub_progress() -> str:
+    """Checks the Hub repository to see which stages are already completed."""
+    _update(message="Checking Hub for existing checkpoints...")
+    api = HfApi(token=os.environ.get("HF_TOKEN"))
+    try:
+        files = [f.path for f in api.list_repo_tree(repo_id=MODEL_REPO)]
+        
+        # Order matters: check latest stages first
+        if "plots/03_mttr_comparison.png" in files:
+            return "complete"
+        if "training_runs/eval_summary_stageC.csv" in files:
+            return "eval"
+        if "adapter/adapter_model.bin" in files or "adapter/adapter_model.safetensors" in files:
+            _load_checkpoint_from_hub("adapter", "outputs/grpo-stagec")
+            return "stage_c"
+        if "stage_b/adapter_model.bin" in files or "stage_b/adapter_model.safetensors" in files:
+            _load_checkpoint_from_hub("stage_b", "outputs/grpo-stageb")
+            return "stage_b"
+        if "stage_a_sft/adapter_model.bin" in files or "stage_a_sft/adapter_model.safetensors" in files:
+            _load_checkpoint_from_hub("stage_a_sft", "outputs/stage-a-sft")
+            return "stage_a"
+            
+        return ""
+    except Exception as e:
+        _update(message=f"⚠️ Hub check failed (likely new repo): {e}")
+        return ""
+
+def _load_checkpoint_from_hub(hub_path: str, local_path: str):
+    """Downloads a checkpoint from the Hub and prepares it for the pipeline."""
+    _update(message=f"📥 Downloading checkpoint: {hub_path} -> {local_path}...")
+    api = HfApi(token=os.environ.get("HF_TOKEN"))
+    api.snapshot_download(
+        repo_id=MODEL_REPO,
+        allow_patterns=[f"{hub_path}/*"],
+        local_dir="/tmp/resume_cache"
+    )
+    # Move to the expected location
+    import shutil
+    src = Path("/tmp/resume_cache") / hub_path
+    dest = Path(local_path)
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(src, dest)
+    _update(message=f"✅ Checkpoint {hub_path} ready locally.")
 
     wandb_key = os.environ.get("WANDB_API_KEY", "").strip()
     if wandb_key:

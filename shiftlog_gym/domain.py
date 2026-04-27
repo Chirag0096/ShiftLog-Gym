@@ -62,6 +62,8 @@ class EpisodeMetrics:
     recall_linked_success: int = 0
     linked_total: int = 0
     linked_success: int = 0
+    blind_action_count: int = 0
+    action_on_linked_count: int = 0
     contradiction_count: int = 0
     bad_write_count: int = 0
     fabricated_resolution_count: int = 0
