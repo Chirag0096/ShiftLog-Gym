@@ -296,5 +296,6 @@ def _get_pipeline():
             _pipeline_instance = ColabTrainingPipeline()
             _pipeline_instance.wandb_enabled = bool(os.environ.get("WANDB_API_KEY"))
             _pipeline_instance.hf_enabled = bool(os.environ.get("HF_TOKEN"))
+            _pipeline_instance.step_callback = _update  # Hook live updates to the UI state
             _pipeline_instance.load_model("Qwen/Qwen2.5-1.5B-Instruct")
         return _pipeline_instance

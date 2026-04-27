@@ -65,6 +65,7 @@ class ColabTrainingPipeline:
         for path in (self.obs_root, self.runs_dir, self.episodes_dir, self.outputs_dir, self.plots_dir):
             path.mkdir(parents=True, exist_ok=True)
 
+        self.step_callback = None # Optional callable for live updates: fn(metrics_dict)
         self.wandb_enabled = False
         self.hf_enabled = False
         self.model = None
@@ -291,7 +292,28 @@ class ColabTrainingPipeline:
         )
 
         try:
-            trainer = SFTTrainer(model=self.model, args=config, train_dataset=dataset, processing_class=self.tokenizer)
+            callbacks = []
+            if self.step_callback:
+                from transformers import TrainerCallback
+                class SFTStepCallback(TrainerCallback):
+                    def on_log(self, args, state, control, logs=None, **kwargs):
+                        if logs and self.pipeline.step_callback:
+                            self.pipeline.step_callback({
+                                "step": state.global_step,
+                                "loss": logs.get("loss", 0.0),
+                                "message": f"SFT Warmup: Step {state.global_step}/50"
+                            })
+                cb = SFTStepCallback()
+                cb.pipeline = self
+                callbacks.append(cb)
+
+            trainer = SFTTrainer(
+                model=self.model, 
+                args=config, 
+                train_dataset=dataset, 
+                processing_class=self.tokenizer,
+                callbacks=callbacks
+            )
             trainer.train()
             trainer.save_model("outputs/stage-a-sft")
             self.tokenizer.save_pretrained("outputs/stage-a-sft")
@@ -382,6 +404,27 @@ class ColabTrainingPipeline:
                                 wandb.log(payload, step=state.global_step)
 
                 trainer.add_callback(RewardSignalCallback())
+
+            if self.step_callback:
+                from transformers import TrainerCallback
+                class GRPOStepCallback(TrainerCallback):
+                    def on_log(self, args, state, control, logs=None, **kwargs):
+                        if logs and self.pipeline.step_callback:
+                            # Extract useful metrics for the UI
+                            payload = {
+                                "step": state.global_step,
+                                "reward_total": logs.get("reward_total", logs.get("reward", 0.0)),
+                                "reward_recall": logs.get("reward_recall", 0.0),
+                                "recall_rate": logs.get("recall_before_action_rate", 0.0),
+                                "loss": logs.get("loss", 0.0),
+                                "message": f"GRPO {self.stage_name}: Step {state.global_step}/{self.max_steps}"
+                            }
+                            self.pipeline.step_callback(payload)
+                cb = GRPOStepCallback()
+                cb.pipeline = self
+                cb.stage_name = stage.name
+                cb.max_steps = stage.max_steps
+                trainer.add_callback(cb)
 
             trainer.train()
             trainer.save_model(output_dir)
