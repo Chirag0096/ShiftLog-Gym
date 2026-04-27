@@ -548,19 +548,30 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             """)
             
             gr.HTML("""
-            <div class="glass" style="margin: 20px 0;">
+            <div class="glass" style="margin: 20px 0; padding: 20px;">
               <pre class="mermaid" style="background:transparent; color:white; text-align:center;">
-              graph LR
-                P[Precursor Incident] -->|Write to Log| L(Shift Log)
-                L -->|Recall Link| A[Active Incident]
-                A -->|Blind Action| E[❌ ERROR: Outage]
-                A -->|Recall + Tool| S[✅ SUCCESS: MTTR Reduced]
-                
-                style P fill:#4338ca,stroke:#6366f1,color:#fff
-                style L fill:#1e1b4b,stroke:#6366f1,color:#fff
-                style A fill:#7c3aed,stroke:#a78bfa,color:#fff
-                style E fill:#991b1b,stroke:#f87171,color:#fff
-                style S fill:#065f46,stroke:#34d399,color:#fff
+              graph TD
+                subgraph Shift_1 ["Shift 1: Precursor (Yesterday)"]
+                    P1["Incident A: Auth Latency"] -->|Root Cause| RC1["DB Pool Exhaustion"]
+                    RC1 -->|tool: append_shift_log| L[(📜 Global Shift Log)]
+                end
+
+                subgraph Shift_2 ["Shift 2: Active (Today)"]
+                    P2["Incident B: Payment Timeout"] -->|tool: read_shift_log| L
+                    L -->|Causal Retrieval| A{Agent Decision}
+                    A -->|Blind Action| E["❌ Vibe Coding: Restart App"]
+                    A -->|Recall RC1| S["✅ Causal Fix: Scale DB Pool"]
+                end
+
+                E -->|Result| O1["Outage Continued"]
+                S -->|Result| O2["MTTR Reduced -85%"]
+
+                style L fill:#1e1b4b,stroke:#6366f1,stroke-width:4px,color:#fff
+                style Shift_1 fill:rgba(99,102,241,0.05),stroke:#4338ca,stroke-dasharray: 5 5
+                style Shift_2 fill:rgba(124,58,237,0.05),stroke:#7c3aed,stroke-dasharray: 5 5
+                style RC1 fill:#1e1b4b,stroke:#6366f1,color:#fff
+                style S fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#fff
+                style E fill:#7f1d1d,stroke:#f87171,stroke-width:2px,color:#fff
               </pre>
             </div>
             <script type="module">
