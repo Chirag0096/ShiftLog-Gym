@@ -244,11 +244,40 @@ def load_plot(name):
     p = PLOTS / name
     return str(p) if p.exists() else None
 
+def _create_plotly_figure(csv_name, y_col, title, color="#6366f1"):
+    try:
+        import plotly.express as px
+        p = ROOT / "training_runs" / csv_name
+        if not p.exists():
+            return None
+        df = pd.read_csv(p)
+        fig = px.line(df, x=df.index, y=y_col, title=title, template="plotly_dark")
+        fig.update_traces(line_color=color)
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="#94a3b8",
+            margin=dict(l=20, r=20, t=40, b=20)
+        )
+        return fig
+    except Exception:
+        return None
+
 def refresh_results():
-    return (training_banner(), metric_cards_html(),
-            load_plot("01_reward_curve.png"),
-            load_plot("02_recall_bonus_curve.png"),
-            load_plot("03_mttr_comparison.png"))
+    banner = training_banner()
+    cards = metric_cards_html()
+    
+    # Interactive Plots
+    p_reward = _create_plotly_figure("eval_summary_stageC.csv", "total_reward", "Reward vs Episodes", "#8b5cf6")
+    p_recall = _create_plotly_figure("eval_summary_stageC.csv", "recall_before_action_rate", "Recall Rate (R2)", "#38bdf8")
+    p_mttr   = _create_plotly_figure("eval_summary_stageC.csv", "MTTR", "MTTR Reduction", "#10b981")
+    
+    # Static Images (Mapping to actual files found in plots/)
+    img1 = load_plot("train_loss.png")
+    img2 = load_plot("train_accuracy.png")
+    img3 = load_plot("global_step.png")
+    
+    return banner, cards, p_reward, p_recall, p_mttr, img1, img2, img3
 
 def get_training_status():
     """Read full background training log with tail-like behavior."""
@@ -519,7 +548,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                 img3 = gr.Image(value=load_plot("03_mttr_comparison.png"), label="MTTR Comparison")
             
             ref_btn = gr.Button("🔄 Refresh Results", variant="secondary")
-            ref_btn.click(fn=refresh_results, outputs=[t2_banner, t2_cards, img1, img2, img3])
+            ref_btn.click(fn=refresh_results, outputs=[t2_banner, t2_cards, plot_reward, plot_recall, plot_mttr, img1, img2, img3])
 
         # TAB 3 — Research Story
         with gr.Tab("🔬 Research Story"):
@@ -724,6 +753,6 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
     # --- Initialization ---
     # Populate dynamic fields on load instead of using value=fn to avoid reactive loops
     demo.load(fn=system_status_md, outputs=[status_label])
-    demo.load(fn=refresh_results, outputs=[t2_banner, t2_cards, img1, img2, img3])
     # Sync training UI on page load/refresh
+    demo.load(fn=refresh_results, outputs=[t2_banner, t2_cards, plot_reward, plot_recall, plot_mttr, img1, img2, img3])
     demo.load(fn=poll_training_state, outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, metric_vibe, wandb_link, model_link])

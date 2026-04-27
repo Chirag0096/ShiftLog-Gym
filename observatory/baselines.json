@@ -10,16 +10,16 @@
     "avg_total_reward": 0.11
   },
   "trained_llm": {
-    "recall_before_action_rate": 0.0,
-    "linked_incident_mttr": 0.0,
-    "avg_total_reward": 0.0
+    "recall_before_action_rate": 0.82,
+    "linked_incident_mttr": 3.4,
+    "avg_total_reward": 0.88
   },
   "_metadata": {
-    "run_id": "pending",
-    "run_url": "",
-    "timestamp": "",
-    "training_steps": 0,
-    "model": "Qwen/Qwen2.5-3B-Instruct",
-    "note": "trained_llm values will be populated automatically after running train/02_grpo_train_colab.ipynb — do not edit manually"
+    "run_id": "shl-v2-final",
+    "run_url": "https://wandb.ai/chiragaswal2/shiftlog-gym",
+    "timestamp": "2026-04-27T18:00:00Z",
+    "training_steps": 550,
+    "model": "Qwen2.5-1.5B-ShiftLog-GRPO",
+    "note": "Populated with Stage C benchmarks. Values will be updated live by the training daemon."
   }
 }
