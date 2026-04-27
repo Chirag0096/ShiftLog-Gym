@@ -369,47 +369,34 @@ _REWARD_ROWS = "".join(
         ("Handoff Quality","2%","Structured shift handoff summary"),
     ]
 )
+STORY_HTML = f"""
+<h2 style="background:linear-gradient(90deg,#38bdf8,#818cf8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent">The Memory Gap in Frontier AI</h2>
+<p style="color:#94a3b8;line-height:1.8">Every frontier lab ships memory as a product feature.
+None trained the model to decide <em>what to write, when to retrieve, and what to safely forget.</em>
+ShiftLog-Gym fills this gap with a verifiable, causal SRE environment and 8 grounded reward signals.</p>
+<table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:.95rem">
+<thead><tr style="border-bottom:2px solid rgba(255,255,255,.2)">
+<th style="padding:10px;text-align:left;color:#94a3b8">Capability</th>
+<th style="padding:10px;color:#94a3b8">Memory-R1</th>
+<th style="padding:10px;color:#94a3b8">MemAgent</th>
+<th style="padding:10px;color:#4ade80">ShiftLog-Gym</th></tr></thead>
+<tbody>{_CAP_ROWS}</tbody></table>
+<h3 style="color:#818cf8;margin-top:32px">8 Reward Signals (weights sum to 1.0)</h3>
+<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.9rem">
+<thead><tr style="border-bottom:2px solid rgba(255,255,255,.2)">
+<th style="padding:8px;text-align:left;color:#94a3b8">Signal</th>
+<th style="padding:8px;color:#94a3b8">Weight</th>
+<th style="padding:8px;color:#94a3b8">What it measures</th></tr></thead>
+<tbody>{_REWARD_ROWS}</tbody></table>
+<h3 style="color:#818cf8;margin-top:32px">6 Scenario Families</h3>
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px">{_FAMILY_PILLS}</div>
+"""
 _FAMILY_PILLS = "".join(
     f'<span style="background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);'
     f'border-radius:8px;padding:8px 14px;font-size:.9rem;color:#e2e8f0">{f}</span>'
     for f in ["db_pool","auth_cascade","oom_regression","feature_flag","network_partition","config_drift"]
 )
-        with gr.Tab("🔬 Research Story"):
-            gr.Markdown("""
-            ## The Causal Memory Challenge
-            In complex SRE environments, incidents are rarely isolated. A database failure at 10:00 AM might cause a payment timeout at 2:00 PM. 
-            Traditional LLMs suffer from **Context Drift**—they forget the morning's root cause by the time the afternoon symptoms arrive.
-            
-            ### Causal Flow of an Incident Shift
-            """)
-            
-            gr.HTML("""
-            <div class="glass" style="margin: 20px 0;">
-              <pre class="mermaid" style="background:transparent; color:white; text-align:center;">
-              graph LR
-                P[Precursor Incident] -->|Write to Log| L(Shift Log)
-                L -->|Recall Link| A[Active Incident]
-                A -->|Blind Action| E[❌ ERROR: Outage]
-                A -->|Recall + Tool| S[✅ SUCCESS: MTTR Reduced]
-                
-                style P fill:#4338ca,stroke:#6366f1,color:#fff
-                style L fill:#1e1b4b,stroke:#6366f1,color:#fff
-                style A fill:#7c3aed,stroke:#a78bfa,color:#fff
-                style E fill:#991b1b,stroke:#f87171,color:#fff
-                style S fill:#065f46,stroke:#34d399,color:#fff
-              </pre>
-            </div>
-            <script type="module">
-              import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-              mermaid.initialize({ startOnLoad: true, theme: 'dark' });
-            </script>
-            """)
-            
-            gr.Markdown("""
-            ### The GRPO Solution
-            Our model is trained using **Group Relative Policy Optimization** to penalize "Vibe Coding" (acting without reading) 
-            and reward "Causal Recall" (linking symptoms to prior log entries).
-            """)
 
 # ── Tab 4 ────────────────────────────────────────────────────────────────────
 
@@ -552,6 +539,42 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
 
         # TAB 3 — Research Story
         with gr.Tab("🔬 Research Story"):
+            gr.Markdown("""
+            ## The Causal Memory Challenge
+            In complex SRE environments, incidents are rarely isolated. A database failure at 10:00 AM might cause a payment timeout at 2:00 PM. 
+            Traditional LLMs suffer from **Context Drift**—they forget the morning's root cause by the time the afternoon symptoms arrive.
+            
+            ### Causal Flow of an Incident Shift
+            """)
+            
+            gr.HTML("""
+            <div class="glass" style="margin: 20px 0;">
+              <pre class="mermaid" style="background:transparent; color:white; text-align:center;">
+              graph LR
+                P[Precursor Incident] -->|Write to Log| L(Shift Log)
+                L -->|Recall Link| A[Active Incident]
+                A -->|Blind Action| E[❌ ERROR: Outage]
+                A -->|Recall + Tool| S[✅ SUCCESS: MTTR Reduced]
+                
+                style P fill:#4338ca,stroke:#6366f1,color:#fff
+                style L fill:#1e1b4b,stroke:#6366f1,color:#fff
+                style A fill:#7c3aed,stroke:#a78bfa,color:#fff
+                style E fill:#991b1b,stroke:#f87171,color:#fff
+                style S fill:#065f46,stroke:#34d399,color:#fff
+              </pre>
+            </div>
+            <script type="module">
+              import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+              mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+            </script>
+            """)
+            
+            gr.Markdown("""
+            ### The GRPO Solution
+            Our model is trained using **Group Relative Policy Optimization** to penalize "Vibe Coding" (acting without reading) 
+            and reward "Causal Recall" (linking symptoms to prior log entries).
+            """)
+            
             gr.HTML('<div style="max-width:860px;margin:0 auto;color:#e2e8f0;font-family:Inter,sans-serif">' + STORY_HTML + '</div>')
 
         # TAB 4 — API Explorer
