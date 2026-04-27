@@ -39,6 +39,7 @@ from shiftlog_gym.trl_env import (
     reward_recall as reward_recall_env,
     reward_success as reward_success_env,
     reward_total as reward_total_env,
+    reward_vibe_ratio as reward_vibe_ratio_env,
 )
 
 
@@ -215,6 +216,9 @@ class ColabTrainingPipeline:
 
     def reward_handoff_safe(self, *args, **kwargs):
         return self._safe_reward_call(reward_handoff_env, *args, **kwargs)
+
+    def reward_vibe_ratio_safe(self, *args, **kwargs):
+        return self._safe_reward_call(reward_vibe_ratio_env, *args, **kwargs)
 
     def save_curve(self, log_history: list[dict[str, Any]], stage_name: str) -> Path:
         rows: list[dict[str, Any]] = []
@@ -396,6 +400,7 @@ class ColabTrainingPipeline:
                     self.reward_hallucination_safe,
                     self.reward_noise_resistance_safe,
                     self.reward_handoff_safe,
+                    self.reward_vibe_ratio_safe,
                 ],
             )
             # Add this inside run_stage_grpo(), after trainer is constructed, before trainer.train()
@@ -431,6 +436,7 @@ class ColabTrainingPipeline:
                                 "reward_total": logs.get("reward_total", logs.get("reward", 0.0)),
                                 "reward_recall": logs.get("reward_recall", 0.0),
                                 "recall_rate": logs.get("recall_before_action_rate", 0.0),
+                                "vibe_ratio": logs.get("vibe_coding_ratio", 0.0),
                                 "loss": logs.get("loss", 0.0),
                                 "message": f"GRPO {self.stage_name}: Step {state.global_step}/{self.max_steps}"
                             }

@@ -129,6 +129,7 @@ class ShiftLogToolEnv:
             "reward_noise_resistance": subscores.get("noise_resistance", 0.0),
             "reward_handoff": subscores.get("handoff_quality", 0.0),
             "reward_total": DEFAULT_RUBRIC.score(episode_state) if episode_state else 0.0,
+            "vibe_coding_ratio": self.simulator.metrics.vibe_coding_ratio if hasattr(self.simulator, "metrics") else 0.0,
             "episode_state": _json_safe(asdict(episode_state) if episode_state else {}),
         }
 
@@ -196,6 +197,10 @@ def reward_noise_resistance(environments, **kwargs):
 
 def reward_handoff(environments, **kwargs):
     return [env.get_info().get("reward_handoff", 0.0) for env in environments]
+
+
+def reward_vibe_ratio(environments, **kwargs):
+    return [env.get_info().get("vibe_coding_ratio", 0.0) for env in environments]
 
 
 def _json_safe(value: Any) -> Any:
