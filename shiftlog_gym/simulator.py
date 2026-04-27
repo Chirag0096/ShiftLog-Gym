@@ -185,8 +185,6 @@ class ShiftLogSimulator:
             "matched_incident_ids": [entry.incident_id for entry in matches],
         }
         self._record_tool("read_shift_log", message, {"query": query, "limit": limit}, metadata=metadata)
-            )
-        )
         self._current_incident_read = True
         return message
 
