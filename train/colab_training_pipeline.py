@@ -440,7 +440,7 @@ class ColabTrainingPipeline:
                                 "loss": logs.get("loss", 0.0),
                                 "message": f"GRPO {self.stage_name}: Step {state.global_step}/{self.max_steps}"
                             }
-                            self.pipeline.step_callback(payload)
+                            self.pipeline.step_callback(**payload)
                 cb = GRPOStepCallback()
                 cb.pipeline = self
                 cb.stage_name = stage.name
@@ -496,7 +496,7 @@ class ColabTrainingPipeline:
                 class SFTFallbackCallback(TrainerCallback):
                     def on_log(self, args, state, control, logs=None, **kwargs):
                         if logs and self.pipeline.step_callback:
-                            self.pipeline.step_callback({
+                            self.pipeline.step_callback(**{
                                 "step": state.global_step,
                                 "loss": logs.get("loss", 0.0),
                                 "message": f"⚠️ SFT Fallback ({self.stage_name}): Step {state.global_step}/{self.max_steps}"
