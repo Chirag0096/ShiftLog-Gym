@@ -557,15 +557,13 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                 E --> O1[Outage Continued]
                 S --> O2[MTTR Reduced 85%]
 
-                style L fill:#1e1b4b,stroke:#6366f1,stroke-width:4px,color:#fff
-                style RC1 fill:#1e1b4b,stroke:#6366f1,color:#fff
-                style S fill:#4ade80,stroke:#166534,stroke-width:2px,color:#064e3b
-                style E fill:#f87171,stroke:#991b1b,stroke-width:2px,color:#7f1d1d
-                style A fill:#1e293b,stroke:#64748b,color:#fff
-                style P1 fill:#1e293b,stroke:#64748b,color:#fff
-                style P2 fill:#1e293b,stroke:#64748b,color:#fff
-                style O1 fill:#7f1d1d,stroke:#f87171,color:#fff
-                style O2 fill:#064e3b,stroke:#4ade80,color:#fff
+                classDef darkNode fill:#1e293b,stroke:#6366f1,color:#fff
+                classDef successNode fill:#064e3b,stroke:#34d399,color:#fff,stroke-width:2px
+                classDef errorNode fill:#7f1d1d,stroke:#f87171,color:#fff,stroke-width:2px
+
+                class P1,RC1,L,P2,A darkNode
+                class S,O2 successNode
+                class E,O1 errorNode
             ```
 
             ### The GRPO Solution
