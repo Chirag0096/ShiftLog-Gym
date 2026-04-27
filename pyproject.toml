@@ -7,7 +7,7 @@ name = "shiftlog-gym"
 version = "0.1.0"
 description = "Professional-domain OpenEnv environment for RL memory policies in SRE incident response."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
   { name = "Chirag Aswal" }
