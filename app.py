@@ -1,4 +1,8 @@
 import os
+# Set cache dirs before any HF imports — prevents permission errors in container
+os.environ.setdefault("HF_HOME", "/tmp/hf_cache")
+os.environ.setdefault("TRANSFORMERS_CACHE", "/tmp/hf_cache")
+os.makedirs("/tmp/hf_cache", exist_ok=True)
 from shiftlog_gym.server.app import app
 from observatory.gradio_app import demo
 import gradio as gr

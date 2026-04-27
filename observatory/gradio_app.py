@@ -5,6 +5,8 @@ from pathlib import Path
 import gradio as gr
 import pandas as pd
 import httpx
+import threading
+from train.space_training_daemon import run_training, get_state
 
 ROOT     = Path(__file__).resolve().parent.parent
 OBS      = ROOT / "observatory"
@@ -48,6 +50,53 @@ body,.gradio-container{font-family:"Inter",sans-serif!important;background:#0b0f
 .gradio-container [role="tab"]{pointer-events:auto!important}
 .gradio-container [role="tabpanel"]{position:relative;z-index:1}
 """
+
+def _render_training_status(state: dict) -> str:
+    """Renders the status card HTML for the training tab."""
+    status = state["status"]
+    color_map = {
+        "idle": "#888888",
+        "running": "#EF9F27",
+        "complete": "#1D9E75",
+        "error": "#E24B4A",
+    }
+    color = color_map.get(status, "#888888")
+    icon_map = {"idle": "⏸", "running": "⚙️", "complete": "✅", "error": "❌"}
+    icon = icon_map.get(status, "⏸")
+    stage = state.get("stage", "")
+    step = state.get("step", 0)
+    total = state.get("total_steps", 550)
+    pct = min(100, int(step / total * 100)) if total > 0 else 0
+    started = state.get("started_at", "")
+    completed = state.get("completed_at", "")
+
+    return f"""
+    <div style="background:rgba(17,24,39,0.9); border:1px solid {color}44; border-radius:12px; padding:20px; color:white;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <span style="font-size:1.2rem; font-weight:700; color:{color}">{icon} {status.upper()}</span>
+        <span style="font-size:0.9rem; color:#94a3b8;">{stage or '—'} | Step {step}/{total}</span>
+      </div>
+      <div style="background:rgba(255,255,255,0.05); border-radius:10px; height:8px; overflow:hidden; margin-bottom:10px;">
+        <div style="background:{color}; width:{pct}%; height:100%; transition: width 0.5s ease;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;">
+        <span>{f'Started: {started[:16].replace("T", " ")}' if started else ''}</span>
+        <span>{f'Finished: {completed[:16].replace("T", " ")}' if completed else ''}</span>
+      </div>
+    </div>
+    """
+
+def _get_gpu_info() -> str:
+    try:
+        import torch
+        if torch.cuda.is_available():
+            name = torch.cuda.get_device_name(0)
+            total = torch.cuda.get_device_properties(0).total_memory / 1e9
+            used = torch.cuda.memory_allocated(0) / 1e9
+            return f"GPU: {name}\nVRAM total: {total:.1f}GB\nVRAM used: {used:.2f}GB"
+        return "No GPU detected.\nUpgrade hardware in Space Settings → L4 x1"
+    except Exception as e:
+        return f"GPU check failed: {e}"
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -488,43 +537,108 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                          outputs=[health_hdr, api_md, scen_md, art_md])
 
         # TAB 6 — Training Lab (New)
-        with gr.Tab("🧪 Training Lab"):
-            gr.Markdown("### 🚀 Space GPU Training Center")
-            with gr.Row():
-                with gr.Column(scale=2):
-                    gr.Markdown("#### 📝 Live Terminal Output")
-                    tr_status = gr.Code(
-                        value=get_training_status(), 
-                        language="shell", 
-                        lines=25,
-                        label="Training Terminal"
-                    )
-                    # Auto-refresh status every 2 seconds
-                    gr.Timer(2.0, active=True).tick(fn=get_training_status, outputs=[tr_status])
-                
-                with gr.Column(scale=1):
-                    target_repo = gr.Textbox(
-                        label="HF Model Repository",
-                        value="Chirag0123/shiftlog-gym-qwen-memory-policy",
-                        placeholder="username/repo-name"
-                    )
-                    wandb_input = gr.Textbox(
-                        label="Weights & Biases API Key (Optional)",
-                        placeholder="Paste key from wandb.ai/settings",
-                        type="password"
-                    )
-                    launch_btn = gr.Button("🚀 Launch Full GRPO Training", variant="primary")
-                    launch_info = gr.Markdown("")
-                    
+        with gr.Tab("⚙️ Training"):
             gr.Markdown("""
-            > **Note:** If you provide a WandB key, you can track real-time charts at [wandb.ai](https://wandb.ai). 
-            > The Space will upload final weights and plots to your model repo automatically.
-            """)
+            ## Run GRPO Training — HuggingFace Space GPU
             
-            launch_btn.click(
-                fn=start_hf_training, 
-                inputs=[target_repo, wandb_input], 
-                outputs=[launch_btn, launch_info]
+            **Before clicking Start:** Confirm in Space Settings that:
+            - Hardware is set to **L4 x1** (not CPU)
+            - Secrets `HF_TOKEN` and `WANDB_API_KEY` are set
+            - Variable `TRAIN_ENABLED` = `"1"`
+            
+            Training runs 3 stages: **A** (SFT, 50 steps) → **B** (GRPO, 200 steps) → **C** (GRPO, 300 steps)
+            Estimated time: **3–4 hours** | Estimated GPU cost: **~$3–4** of your $30 credit
+            """)
+
+            with gr.Row():
+                with gr.Column(scale=1):
+                    # Status card
+                    status_display = gr.HTML(value=_render_training_status(get_state()))
+
+                    # Start button — disabled if not on GPU
+                    start_btn = gr.Button(
+                        "🚀 Start Training",
+                        variant="primary",
+                        size="lg",
+                        interactive=os.environ.get("TRAIN_ENABLED", "0") == "1"
+                    )
+                    if os.environ.get("TRAIN_ENABLED", "0") != "1":
+                        gr.Markdown(
+                            "⚠️ **Training disabled.** Set `TRAIN_ENABLED=1` in Space Settings "
+                            "→ Variables and secrets, then restart the Space."
+                        )
+
+                    # GPU info
+                    gpu_info_box = gr.Textbox(
+                        label="GPU Status",
+                        value=_get_gpu_info(),
+                        interactive=False,
+                        lines=3,
+                    )
+
+                with gr.Column(scale=2):
+                    # Live log
+                    log_display = gr.Textbox(
+                        label="Training Log (live)",
+                        value="Training not started.",
+                        interactive=False,
+                        lines=20,
+                        max_lines=20,
+                    )
+
+            # Progress metrics row
+            with gr.Row():
+                metric_step = gr.Number(label="Steps Completed", value=0, interactive=False)
+                metric_recall = gr.Number(label="Recall Rate (R2)", value=0.0, interactive=False)
+                metric_reward = gr.Number(label="Total Reward", value=0.0, interactive=False)
+
+            # WandB + Model links
+            with gr.Row():
+                wandb_link = gr.Textbox(label="WandB Run URL", value="", interactive=False)
+                model_link = gr.Textbox(label="Trained Model URL", value="", interactive=False)
+
+            # ─── Callbacks ──────────────────────────────────────────────────────────
+            def handle_start_training():
+                state = get_state()
+                if state["status"] == "running":
+                    return (
+                        _render_training_status(state),
+                        "\n".join(state["log_lines"]),
+                        state["step"], state["recall_rate"], state["reward_total"],
+                        state["wandb_url"], state["model_url"],
+                    )
+                t = threading.Thread(target=run_training, daemon=True)
+                t.start()
+                time.sleep(0.5)
+                state = get_state()
+                return (
+                    _render_training_status(state),
+                    "\n".join(state["log_lines"]),
+                    state["step"], state["recall_rate"], state["reward_total"],
+                    state["wandb_url"], state["model_url"],
+                )
+
+            def poll_training_state():
+                state = get_state()
+                return (
+                    _render_training_status(state),
+                    "\n".join(state["log_lines"]),
+                    state["step"], state["recall_rate"], state["reward_total"],
+                    state["wandb_url"], state["model_url"],
+                )
+
+            start_btn.click(
+                fn=handle_start_training,
+                inputs=[],
+                outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, wandb_link, model_link],
+            )
+
+            # Auto-refresh every 15 seconds while training is running
+            refresh_timer = gr.Timer(value=15)
+            refresh_timer.tick(
+                fn=poll_training_state,
+                inputs=[],
+                outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, wandb_link, model_link],
             )
 
     # Footer

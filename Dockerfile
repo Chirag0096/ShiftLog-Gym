@@ -1,36 +1,43 @@
-FROM python:3.11-slim
+# Use NVIDIA CUDA base image for GPU training at runtime
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 
-RUN apt-get update && apt-get install -y git build-essential curl
+# ─── System deps ──────────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y \
+    python3.11 python3.11-dev python3-pip git curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/python3.11 /usr/bin/python \
+    && ln -s /usr/bin/pip3 /usr/bin/pip
 
-# Set up a non-root user for Hugging Face Spaces per guidelines
-RUN useradd -m -u 1000 user
-USER user
-ENV PATH="/home/user/.local/bin:$PATH"
+WORKDIR /app
 
-WORKDIR /home/user/app
+# ─── Install Python deps ───────────────────────────────────────────────────────
+# Copy requirements first for Docker layer caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install astral-uv
-COPY --from=ghcr.io/astral-sh/uv:0.4 /uv /uvx /bin/
+# Install training deps — these are heavy but needed for GPU training
+# They are installed at BUILD time so the Space doesn't need to download them at runtime
+RUN pip install --no-cache-dir \
+    "trl==0.8.6" \
+    "peft>=0.10.0" \
+    "bitsandbytes>=0.43.0" \
+    "accelerate>=0.28.0" \
+    "transformers>=4.40.0" \
+    "datasets>=2.18.0" \
+    "wandb>=0.16.0" \
+    "scipy" \
+    "einops"
 
-# Create a virtual environment for uv to avoid system directory permission errors
-RUN uv venv /home/user/venv
-ENV PATH="/home/user/venv/bin:$PATH"
+# ─── Copy project ─────────────────────────────────────────────────────────────
+COPY . .
+RUN pip install --no-cache-dir -e ".[observatory]"
 
-COPY --chown=user requirements.txt .
-RUN uv pip install --no-cache -r requirements.txt
+# ─── Runtime env ──────────────────────────────────────────────────────────────
+ENV HF_HOME=/tmp/hf_cache
+ENV TRANSFORMERS_CACHE=/tmp/hf_cache
+ENV TOKENIZERS_PARALLELISM=false
+# TRAIN_ENABLED is set as a Space Variable in Settings, not here
 
-COPY --chown=user pyproject.toml .
-COPY --chown=user shiftlog_gym ./shiftlog_gym
-COPY --chown=user observatory ./observatory
-COPY --chown=user train ./train
-COPY --chown=user tests ./tests
-COPY --chown=user app.py .
-COPY --chown=user run_training.py .
-COPY --chown=user README.md .
-
-RUN mkdir -p plots && chown user:user plots
-
-# Install the package seamlessly with uv
-RUN uv pip install -e .[observatory]
-
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
+# ─── Start server ─────────────────────────────────────────────────────────────
+EXPOSE 7860
+CMD ["python", "app.py"]
