@@ -40,15 +40,19 @@ DEMO_STEPS = [
 ]
 
 custom_css = """
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap");
-body,.gradio-container{font-family:"Inter",sans-serif!important;background:#0b0f19!important;color:#e2e8f0!important}
-.glass{background:rgba(17,24,39,.75)!important;backdrop-filter:blur(12px)!important;
-  border:1px solid rgba(255,255,255,.08)!important;border-radius:16px!important;padding:24px!important}
-.btn-main{background:linear-gradient(90deg,#6366f1,#8b5cf6)!important;color:#fff!important;font-weight:600!important}
-/* Keep tab navigation above content overlays in Gradio 5/6 mounted mode */
-.gradio-container [role="tablist"]{position:relative;z-index:50;pointer-events:auto!important}
-.gradio-container [role="tab"]{pointer-events:auto!important}
-.gradio-container [role="tabpanel"]{position:relative;z-index:1}
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono&display=swap");
+body,.gradio-container{font-family:"Outfit",sans-serif!important;background:radial-gradient(circle at top right, #1e1b4b, #0f172a, #020617)!important;color:#f8fafc!important}
+.glass{background:rgba(30,41,59,0.5)!important;backdrop-filter:blur(16px)!important;
+  border:1px solid rgba(255,255,255,0.1)!important;border-radius:24px!important;padding:28px!important;
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,0.37)!important;}
+.btn-premium{background:linear-gradient(135deg,#6366f1,#a855f7)!important;color:#fff!important;font-weight:700!important;border:none!important;
+  border-radius:12px!important;transition:all 0.3s ease!important;box-shadow:0 4px 15px rgba(99,102,241,0.4)!important}
+.btn-premium:hover{transform:translateY(-2px)!important;box-shadow:0 6px 20px rgba(99,102,241,0.6)!important}
+.metric-card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;text-align:center;transition:all 0.3s ease}
+.metric-card:hover{background:rgba(255,255,255,0.05);transform:scale(1.02)}
+.gradio-container [role="tablist"]{background:rgba(255,255,255,0.03)!important;border-radius:14px!important;padding:4px!important;margin-bottom:20px!important}
+.gradio-container [role="tab"]{border-radius:10px!important;font-weight:600!important;color:#94a3b8!important;border:none!important}
+.gradio-container [role="tab"][aria-selected="true"]{background:#6366f1!important;color:white!important}
 """
 
 def _render_training_status(state: dict) -> str:
@@ -663,6 +667,33 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                 inputs=[],
                 outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, wandb_link, model_link],
             )
+
+        # TAB 7 — User Guide & Documentation
+        with gr.Tab("📖 Guide"):
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("""
+                    ### 🚀 Getting Started
+                    1. **Environment**: Switch to **L4 GPU** in Settings.
+                    2. **Auth**: Add `HF_TOKEN` and `WANDB_API_KEY` to Secrets.
+                    3. **Unlock**: Add `TRAIN_ENABLED=1` to Variables.
+                    4. **Run**: Go to the **Training** tab and click Start.
+                    
+                    ### 🔍 How it Works
+                    - **Stage A (Warmup)**: Teaches the model the basic JSON tool format via SFT.
+                    - **Stage B (Memory Rollout)**: Uses GRPO to optimize causal retrieval on simple incidents.
+                    - **Stage C (Full Shift)**: Scales GRPO to all 6 incident families and 8-hour shifts.
+                    """)
+                with gr.Column(scale=1):
+                    gr.Markdown("""
+                    ### 📊 Metrics Explained
+                    - **Recall Rate (R2)**: The probability that the agent reads the shift log *before* taking a destructive action on a linked incident.
+                    - **MTTR (Steps)**: Average number of tool calls to reach "Resolution".
+                    - **Total Reward**: A weighted sum of success, efficiency, and memory integrity.
+                    
+                    ### 📦 Exporting Results
+                    Once complete, the model adapter is pushed to your HF Hub repo, and the evidence plots are committed back to this Space.
+                    """)
 
     # Footer
     gr.HTML("""<div style="text-align:center;padding:20px;color:#64748b;font-size:0.85rem;border-top:1px solid rgba(255,255,255,0.05)">

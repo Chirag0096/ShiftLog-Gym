@@ -360,6 +360,7 @@ class ColabTrainingPipeline:
             report_to=["wandb"] if self.wandb_enabled else [],
             log_completions=True,
             gradient_checkpointing=True,
+            use_vllm=False, # Important: Space doesn't have vLLM pre-installed
             fp16=self.use_fp16,
             bf16=self.use_bf16,
         )
@@ -433,6 +434,7 @@ class ColabTrainingPipeline:
             self.save_curve(trainer.state.log_history, stage.name)
             return {"stage": stage.name, "mode": "grpo", "error": ""}
         except Exception as error:
+            print(f"⚠️ GRPO failed, falling back to SFT: {error}")
             fallback = [
                 {
                     "text": (
@@ -467,7 +469,31 @@ class ColabTrainingPipeline:
                 fp16=self.use_fp16,
                 bf16=self.use_bf16,
             )
-            trainer = SFTTrainer(model=self.model, args=fallback_cfg, train_dataset=fallback_ds, processing_class=self.tokenizer)
+            
+            callbacks = []
+            if self.step_callback:
+                from transformers import TrainerCallback
+                class SFTFallbackCallback(TrainerCallback):
+                    def on_log(self, args, state, control, logs=None, **kwargs):
+                        if logs and self.pipeline.step_callback:
+                            self.pipeline.step_callback({
+                                "step": state.global_step,
+                                "loss": logs.get("loss", 0.0),
+                                "message": f"⚠️ SFT Fallback ({self.stage_name}): Step {state.global_step}/{self.max_steps}"
+                            })
+                cb = SFTFallbackCallback()
+                cb.pipeline = self
+                cb.stage_name = stage.name
+                cb.max_steps = stage.max_steps
+                callbacks.append(cb)
+
+            trainer = SFTTrainer(
+                model=self.model, 
+                args=fallback_cfg, 
+                train_dataset=fallback_ds, 
+                processing_class=self.tokenizer,
+                callbacks=callbacks
+            )
             trainer.train()
             trainer.save_model(output_dir)
             self.tokenizer.save_pretrained(output_dir)
