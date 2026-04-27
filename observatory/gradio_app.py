@@ -555,18 +555,17 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                     # Status card
                     status_display = gr.HTML(value=_render_training_status(get_state()))
 
-                    # Start button — disabled if not on GPU
+                    # Start button — always interactive for better UX, we handle errors in the callback
                     start_btn = gr.Button(
                         "🚀 Start Training",
                         variant="primary",
                         size="lg",
-                        interactive=os.environ.get("TRAIN_ENABLED", "0") == "1"
+                        interactive=True
                     )
-                    if os.environ.get("TRAIN_ENABLED", "0") != "1":
-                        gr.Markdown(
-                            "⚠️ **Training disabled.** Set `TRAIN_ENABLED=1` in Space Settings "
-                            "→ Variables and secrets, then restart the Space."
-                        )
+                    env_warning = gr.Markdown(
+                        "⚠️ **Requirement:** Set `TRAIN_ENABLED=1` in Space Settings to unlock training."
+                        if os.environ.get("TRAIN_ENABLED", "0") != "1" else ""
+                    )
 
                     # GPU info
                     gpu_info_box = gr.Textbox(
@@ -599,6 +598,13 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
 
             # ─── Callbacks ──────────────────────────────────────────────────────────
             def handle_start_training():
+                if os.environ.get("TRAIN_ENABLED", "0") != "1":
+                    return (
+                        "<div style='color:#f87171; padding:10px; border:1px solid #f87171; border-radius:8px;'>❌ <b>Training Blocked:</b> Set <code>TRAIN_ENABLED=1</code> in Space Settings → Variables & Secrets, then restart the Space.</div>",
+                        "ERROR: Environment variable TRAIN_ENABLED is not set to '1'.",
+                        0, 0.0, 0.0, "", ""
+                    )
+
                 state = get_state()
                 if state["status"] == "running":
                     return (
@@ -607,9 +613,13 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                         state["step"], state["recall_rate"], state["reward_total"],
                         state["wandb_url"], state["model_url"],
                     )
+                
+                # Start in background
                 t = threading.Thread(target=run_training, daemon=True)
                 t.start()
-                time.sleep(0.5)
+                
+                # Wait briefly for init
+                time.sleep(1.0)
                 state = get_state()
                 return (
                     _render_training_status(state),
@@ -650,4 +660,5 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
     # Populate dynamic fields on load instead of using value=fn to avoid reactive loops
     demo.load(fn=system_status_md, outputs=[status_label])
     demo.load(fn=refresh_results, outputs=[t2_banner, t2_cards, img1, img2, img3])
-    # Also reset training status UI on load if it's been a while (optional)
+    # Sync training UI on page load/refresh
+    demo.load(fn=poll_training_state, outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, wandb_link, model_link])
