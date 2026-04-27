@@ -345,28 +345,42 @@ _FAMILY_PILLS = "".join(
     f'border-radius:8px;padding:8px 14px;font-size:.9rem;color:#e2e8f0">{f}</span>'
     for f in ["db_pool","auth_cascade","oom_regression","feature_flag","network_partition","config_drift"]
 )
-STORY_HTML = f"""<div style="max-width:860px;margin:0 auto;color:#e2e8f0;font-family:Inter,sans-serif">
-<h2 style="background:linear-gradient(90deg,#38bdf8,#818cf8);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent">The Memory Gap in Frontier AI</h2>
-<p style="color:#94a3b8;line-height:1.8">Every frontier lab ships memory as a product feature.
-None trained the model to decide <em>what to write, when to retrieve, and what to safely forget.</em>
-ShiftLog-Gym fills this gap with a verifiable, causal SRE environment and 8 grounded reward signals.</p>
-<table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:.95rem">
-<thead><tr style="border-bottom:2px solid rgba(255,255,255,.2)">
-<th style="padding:10px;text-align:left;color:#94a3b8">Capability</th>
-<th style="padding:10px;color:#94a3b8">Memory-R1</th>
-<th style="padding:10px;color:#94a3b8">MemAgent</th>
-<th style="padding:10px;color:#4ade80">ShiftLog-Gym</th></tr></thead>
-<tbody>{_CAP_ROWS}</tbody></table>
-<h3 style="color:#818cf8;margin-top:32px">8 Reward Signals (weights sum to 1.0)</h3>
-<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.9rem">
-<thead><tr style="border-bottom:2px solid rgba(255,255,255,.2)">
-<th style="padding:8px;text-align:left;color:#94a3b8">Signal</th>
-<th style="padding:8px;color:#94a3b8">Weight</th>
-<th style="padding:8px;color:#94a3b8">What it measures</th></tr></thead>
-<tbody>{_REWARD_ROWS}</tbody></table>
-<h3 style="color:#818cf8;margin-top:32px">6 Scenario Families</h3>
-<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px">{_FAMILY_PILLS}</div></div>"""
+        with gr.Tab("🔬 Research Story"):
+            gr.Markdown("""
+            ## The Causal Memory Challenge
+            In complex SRE environments, incidents are rarely isolated. A database failure at 10:00 AM might cause a payment timeout at 2:00 PM. 
+            Traditional LLMs suffer from **Context Drift**—they forget the morning's root cause by the time the afternoon symptoms arrive.
+            
+            ### Causal Flow of an Incident Shift
+            """)
+            
+            gr.HTML("""
+            <div class="glass" style="margin: 20px 0;">
+              <pre class="mermaid" style="background:transparent; color:white; text-align:center;">
+              graph LR
+                P[Precursor Incident] -->|Write to Log| L(Shift Log)
+                L -->|Recall Link| A[Active Incident]
+                A -->|Blind Action| E[❌ ERROR: Outage]
+                A -->|Recall + Tool| S[✅ SUCCESS: MTTR Reduced]
+                
+                style P fill:#4338ca,stroke:#6366f1,color:#fff
+                style L fill:#1e1b4b,stroke:#6366f1,color:#fff
+                style A fill:#7c3aed,stroke:#a78bfa,color:#fff
+                style E fill:#991b1b,stroke:#f87171,color:#fff
+                style S fill:#065f46,stroke:#34d399,color:#fff
+              </pre>
+            </div>
+            <script type="module">
+              import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+              mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+            </script>
+            """)
+            
+            gr.Markdown("""
+            ### The GRPO Solution
+            Our model is trained using **Group Relative Policy Optimization** to penalize "Vibe Coding" (acting without reading) 
+            and reward "Causal Recall" (linking symptoms to prior log entries).
+            """)
 
 # ── Tab 4 ────────────────────────────────────────────────────────────────────
 
@@ -485,25 +499,31 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                            outputs=[chatbot, step_state, incident_info])
 
         # TAB 2 — Training Results
-        with gr.Tab("📊 Training Results"):
+        with gr.Tab("📈 Results"):
             t2_banner = gr.Markdown(value="⌛ Loading results...")
             t2_cards  = gr.HTML(value="<div>Loading metrics...</div>")
-            gr.HTML('''<div style="margin:8px 0">
-<a href="https://wandb.ai/chiragaswal2/shiftlog-gym" target="_blank"
-   style="color:#818cf8;text-decoration:none;font-weight:600">📊 View WandB Run →</a></div>''')
-            gr.Markdown("---\n### Training Plots")
-            img1 = gr.Image(value=load_plot("01_reward_curve.png"),
-                            label="📈 Reward Curve — total reward over training steps")
-            img2 = gr.Image(value=load_plot("02_recall_bonus_curve.png"),
-                            label="🧠 R2 Recall Bonus — memory policy learning curve")
-            img3 = gr.Image(value=load_plot("03_mttr_comparison.png"),
-                            label="⏱ MTTR: Before vs After Training on Linked Incidents")
-            ref_btn = gr.Button("🔄 Refresh Results")
+            
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("### Interactive Training Curves")
+                    plot_reward = gr.Plot(label="Reward Progression")
+                    plot_recall = gr.Plot(label="Recall Rate (R2)")
+                with gr.Column(scale=1):
+                    gr.Markdown("### MTTR Comparison")
+                    plot_mttr = gr.Plot(label="MTTR Improvement")
+                    
+            gr.Markdown("---\n### Historical Performance Snapshots")
+            with gr.Row():
+                img1 = gr.Image(value=load_plot("01_reward_curve.png"), label="Reward Curve")
+                img2 = gr.Image(value=load_plot("02_recall_bonus_curve.png"), label="Recall Rate")
+                img3 = gr.Image(value=load_plot("03_mttr_comparison.png"), label="MTTR Comparison")
+            
+            ref_btn = gr.Button("🔄 Refresh Results", variant="secondary")
             ref_btn.click(fn=refresh_results, outputs=[t2_banner, t2_cards, img1, img2, img3])
 
         # TAB 3 — Research Story
-        with gr.Tab("🧠 Research Story"):
-            gr.HTML(STORY_HTML)
+        with gr.Tab("🔬 Research Story"):
+            gr.HTML('<div style="max-width:860px;margin:0 auto;color:#e2e8f0;font-family:Inter,sans-serif">' + STORY_HTML + '</div>')
 
         # TAB 4 — API Explorer
         with gr.Tab("⚙️ API Explorer"):
@@ -601,6 +621,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                 metric_step = gr.Number(label="Steps Completed", value=0, interactive=True)
                 metric_recall = gr.Number(label="Recall Rate (R2)", value=0.0, interactive=True)
                 metric_reward = gr.Number(label="Total Reward", value=0.0, interactive=True)
+                metric_vibe = gr.Number(label="Vibe Coding Ratio", value=0.0, interactive=True)
 
             # WandB + Model links (now editable as requested)
             with gr.Row():
@@ -613,7 +634,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                     return (
                         "<div style='color:#f87171; padding:10px; border:1px solid #f87171; border-radius:8px;'>❌ <b>Training Blocked:</b> Set <code>TRAIN_ENABLED=1</code> in Space Settings → Variables & Secrets, then restart the Space.</div>",
                         "ERROR: Environment variable TRAIN_ENABLED is not set to '1'.",
-                        0, 0.0, 0.0, "", ""
+                        0, 0.0, 0.0, 0.0, "", ""
                     )
 
                 # Update target repo in daemon if provided (handles full URLs gracefully)
@@ -627,7 +648,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                     return (
                         _render_training_status(state),
                         "\n".join(state["log_lines"]),
-                        state["step"], state["recall_rate"], state["reward_total"],
+                        state["step"], state["recall_rate"], state["reward_total"], state["vibe_ratio"],
                         state["wandb_url"], state["model_url"],
                     )
                 
@@ -641,7 +662,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                 return (
                     _render_training_status(state),
                     "\n".join(state["log_lines"]),
-                    state["step"], state["recall_rate"], state["reward_total"],
+                    state["step"], state["recall_rate"], state["reward_total"], state["vibe_ratio"],
                     state["wandb_url"], state["model_url"],
                 )
 
@@ -650,14 +671,14 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                 return (
                     _render_training_status(state),
                     "\n".join(state["log_lines"]),
-                    state["step"], state["recall_rate"], state["reward_total"],
+                    state["step"], state["recall_rate"], state["reward_total"], state["vibe_ratio"],
                     state["wandb_url"], state["model_url"],
                 )
 
             start_btn.click(
                 fn=handle_start_training,
                 inputs=[repo_id_input],
-                outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, wandb_link, model_link],
+                outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, metric_vibe, wandb_link, model_link],
             )
 
             # Auto-refresh every 15 seconds while training is running
@@ -665,7 +686,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             refresh_timer.tick(
                 fn=poll_training_state,
                 inputs=[],
-                outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, wandb_link, model_link],
+                outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, metric_vibe, wandb_link, model_link],
             )
 
         # TAB 7 — User Guide & Documentation
@@ -705,4 +726,4 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
     demo.load(fn=system_status_md, outputs=[status_label])
     demo.load(fn=refresh_results, outputs=[t2_banner, t2_cards, img1, img2, img3])
     # Sync training UI on page load/refresh
-    demo.load(fn=poll_training_state, outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, wandb_link, model_link])
+    demo.load(fn=poll_training_state, outputs=[status_display, log_display, metric_step, metric_recall, metric_reward, metric_vibe, wandb_link, model_link])
