@@ -612,10 +612,11 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
                         0, 0.0, 0.0, "", ""
                     )
 
-                # Update target repo in daemon if provided
+                # Update target repo in daemon if provided (handles full URLs gracefully)
                 import train.space_training_daemon as daemon
                 if repo_id:
-                    daemon.MODEL_REPO = repo_id.strip()
+                    clean_id = repo_id.strip().split("huggingface.co/")[-1].split("?")[0].strip("/")
+                    daemon.MODEL_REPO = clean_id
 
                 state = get_state()
                 if state["status"] == "running":
