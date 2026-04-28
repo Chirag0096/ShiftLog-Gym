@@ -56,30 +56,30 @@ ShiftLog-Gym is designed as a **fused hybrid application**, running both a high-
 ### The Connectivity Matrix
 ```mermaid
 graph TD
-    subgraph "Hugging Face Space (L4 GPU Container)"
+    subgraph Space [Hugging Face Space Container]
         UI[Gradio Observatory Dashboard]
         API[FastAPI OpenEnv API]
         Daemon[Background Training Daemon]
         Sim[ShiftLog Simulator]
         
-        UI <--> Sim
-        API <--> Sim
+        UI --- Sim
+        API --- Sim
         Daemon --> Sim
-        Daemon -- "Broadcasts Telemetry" --> SharedState{_STATE Shared Object}
+        Daemon --> SharedState[Live Shared State]
         SharedState --> UI
     end
     
-    subgraph "External Persistence (Hugging Face Hub)"
+    subgraph Hub [Hugging Face Hub Persistence]
         Repo[Model Repository]
-        Weights[LoRA Adapters / SafeTensors]
-        Metrics[Performance Plots & CSVs]
+        Weights[LoRA Adapters]
+        Metrics[Performance Metrics]
         Stages[Stage Markers]
     end
     
-    Daemon -- "Incremental Upload" --> Weights
-    Daemon -- "Artifact Sync" --> Metrics
-    Daemon -- "State Persistence" --> Stages
-    UI -- "Fetches History" --> Metrics
+    Daemon --> Weights
+    Daemon --> Metrics
+    Daemon --> Stages
+    UI --> Metrics
 ```
 
 ### How "Sync" Works
