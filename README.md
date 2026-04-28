@@ -54,9 +54,11 @@ The deeper failure: every memory solution — ChatGPT Memory, Claude Projects, G
 ShiftLog-Gym is designed as a **fused hybrid application**, running both a high-performance RL environment and a real-time observability dashboard within a single Docker container.
 
 ### The Connectivity Matrix
+
 ```mermaid
 graph TD
-    subgraph Space [Hugging Face Space Container]
+    subgraph Space
+        direction TB
         UI[Gradio Observatory Dashboard]
         API[FastAPI OpenEnv API]
         Daemon[Background Training Daemon]
@@ -69,7 +71,8 @@ graph TD
         SharedState --> UI
     end
     
-    subgraph Hub [Hugging Face Hub Persistence]
+    subgraph Hub
+        direction TB
         Repo[Model Repository]
         Weights[LoRA Adapters]
         Metrics[Performance Metrics]
@@ -81,6 +84,7 @@ graph TD
     Daemon --> Stages
     UI --> Metrics
 ```
+
 
 ### How "Sync" Works
 1.  **Shared Memory State**: The `space_training_daemon` runs in a detached thread, updating a thread-safe `_STATE` dictionary. The Gradio UI polls this dictionary every 1.5 seconds to provide zero-latency telemetry.
