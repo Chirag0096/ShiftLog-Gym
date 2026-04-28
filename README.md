@@ -49,13 +49,49 @@ The deeper failure: every memory solution — ChatGPT Memory, Claude Projects, G
 
 ---
 
-## 🏗 Architecture & Workflow
+## 🏗 System Architecture & Data Sync
+
+ShiftLog-Gym is designed as a **fused hybrid application**, running both a high-performance RL environment and a real-time observability dashboard within a single Docker container.
+
+### The Connectivity Matrix
+```mermaid
+graph TD
+    subgraph "Hugging Face Space (L4 GPU Container)"
+        UI[Gradio Observatory Dashboard]
+        API[FastAPI OpenEnv API]
+        Daemon[Background Training Daemon]
+        Sim[ShiftLog Simulator]
+        
+        UI <--> Sim
+        API <--> Sim
+        Daemon --> Sim
+        Daemon -- "Broadcasts Telemetry" --> SharedState{_STATE Shared Object}
+        SharedState --> UI
+    end
+    
+    subgraph "External Persistence (Hugging Face Hub)"
+        Repo[Model Repository]
+        Weights[LoRA Adapters / SafeTensors]
+        Metrics[Performance Plots & CSVs]
+        Stages[Stage Markers]
+    end
+    
+    Daemon -- "Incremental Upload" --> Weights
+    Daemon -- "Artifact Sync" --> Metrics
+    Daemon -- "State Persistence" --> Stages
+    UI -- "Fetches History" --> Metrics
+```
+
+### How "Sync" Works
+1.  **Shared Memory State**: The `space_training_daemon` runs in a detached thread, updating a thread-safe `_STATE` dictionary. The Gradio UI polls this dictionary every 1.5 seconds to provide zero-latency telemetry.
+2.  **Hub Persistence**: Hugging Face Spaces are ephemeral. To ensure training progress isn't lost, the daemon performs **Incremental Uploads** to the Hugging Face Hub after every stage (A, B, and C).
+3.  **Resilience (Resume Logic)**: On startup, the daemon checks the Hub for `.stage_X_complete` markers. If found, it automatically downloads the last adapter and skips ahead, allowing training to survive Space timeouts or restarts.
+
+---
+
+## 🌊 Shift Scenarios: The 12-Incident Bank
 
 ShiftLog-Gym simulates a complete **8-hour SRE on-call shift** across 12 sequential incidents. Three incident pairs are causally linked — their correct resolution requires the agent to have written and retrieved prior shift log entries.
-
-![Architecture Flow](plots/architecture_flow.jpg)
-
-### The 12-Incident Scenario Bank
 
 | # | Service | Failure Type | Causal Role |
 |---|---|---|---|
@@ -74,7 +110,7 @@ ShiftLog-Gym simulates a complete **8-hour SRE on-call shift** across 12 sequent
 
 ---
 
-## 🧪 Deep Research & Mathematical Framework
+## 🧪 Mathematical Framework & Pipeline
 
 ### 1. The Optimization Objective: GRPO
 ShiftLog-Gym utilizes **Group Relative Policy Optimization (GRPO)**, eliminating the need for a separate critic model by computing advantages relative to a group of sampled trajectories.
@@ -90,33 +126,21 @@ We implement a 3-stage curriculum to transition the model from base instruction-
 
 | Stage | Name | Objective | Duration |
 | :--- | :--- | :--- | :--- |
-| **Stage A** | **SFT Warmup** | Align model to JSON schema and tool-calling syntax (50 hand-authored examples). | 50 Steps |
+| **Stage A** | **SFT Warmup** | Align model to JSON schema and tool-calling syntax (50 examples). | 50 Steps |
 | **Stage B** | **GRPO Short** | Optimize for "Recall-before-action" (R2) in 4-incident horizons. | 200 Steps |
-| **Stage C** | **GRPO Full** | Full 8-hour shift optimization (12 incidents) with causal dependency rewards. | 300 Steps |
+| **Stage C** | **GRPO Full** | Full 8-hour shift optimization (12 incidents) with causal rewards. | 300 Steps |
 
 ### 3. Causal Reward Rubric (PRM)
 The **Process Reward Model (PRM)** decomposes the shift into 8 independent, programmatically verifiable signals. The primary causal signal **R2 (Recall Before Action)** is:
 $$R_2 = \frac{1}{|I_{linked}|} \sum_{i \in I_{linked}} \mathbb{1}(\text{tool\_called}(\text{read\_shift\_log}, i) \prec \text{tool\_called}(\text{mitigate}, i))$$
 
-#### Anti-Reward-Hacking Design
-| Hacking Attempt | Countermeasure |
-|---|---|
-| Write everything to the log | Log capped at 2,000 tokens. New writes fail when full — agent must summarize. |
-| Never discard anything | Full log means current incident context cannot fit. Retrieval precision degrades. |
-| Escalate every incident | Each unnecessary escalation carries a significant −0.3 penalty. |
-| Resolve without using memory | Brute-force takes 25 steps; memory-recall takes 3. MTTR gap dominates reward. |
-
 ---
 
 ## 📈 Training Results & Performance
 
-### Training Curves (Qwen2.5-3B)
-
 | Token Accuracy | Training Loss |
 | :---: | :---: |
 | ![Accuracy](plots/train_accuracy.png) | ![Loss](plots/train_loss.png) |
-| **Learning Rate** | **Gradient Norm** |
-| ![LR](plots/learning_rate.png) | ![Grad Norm](plots/grad_norm.png) |
 
 ### Performance Gains
 
@@ -129,85 +153,83 @@ $$R_2 = \frac{1}{|I_{linked}|} \sum_{i \in I_{linked}} \mathbb{1}(\text{tool\_ca
 
 ---
 
-## ⚔️ Head-to-Head: Trial-and-Error vs. Causal Reasoning
+---
 
-The fundamental reason ShiftLog-Gym outperforms base models is the shift from **brute-force diagnostic search** to **causal memory retrieval**.
+## 🔬 Deep Research: Causal Memory vs. "Vibe Coding"
 
-### Tool-Call Strategy Comparison
+The core research goal of ShiftLog-Gym is to eliminate **"Vibe Coding"** in autonomous SRE agents.
 
-| Feature | Base Model (Qwen2.5/GPT-4) | ShiftLog-Gym (GRPO Trained) |
-| :--- | :--- | :--- |
-| **First Action** | `run_diagnostic` (Reactive) | `read_shift_log` (Proactive) |
-| **Logic Path** | Diagnostic → Diagnostic → Mitigation | Memory → Causal Link → Mitigation |
-| **Context Handling** | Appends everything to context | Externalizes facts to the Shift Log |
-| **Efficiency** | 14–22 steps per incident | **3–5 steps** per incident |
-| **Error Handling** | Repeats failed diagnostics | Updates log to prevent redundant steps |
+### The "Vibe Ratio" Metric
+We define the **Vibe Ratio** as:
+$$\text{Vibe Ratio} = \frac{\text{Tool Actions on Linked Incidents without Prior Log Search}}{\text{Total Tool Actions on Linked Incidents}}$$
+
+- **High Vibe Ratio (>0.7)**: The agent is guessing. It sees a symptom and blindly applies a mitigation (e.g., "Restart Pod") without checking the shift log for precursors.
+- **Low Vibe Ratio (<0.1)**: The agent is reasoning. It recognizes the service topology, queries the log, finds the precursor (e.g., "DB Pool at 90%"), and applies the **Causal Fix** (Scale DB).
+
+### GRPO: Shaping the Policy
+Traditional RL (PPO) often struggles with the sparse rewards of SRE tasks. We use **GRPO (Group Relative Policy Optimization)** to compare multiple agent "ideas" for the same incident. The agent that chooses `read_shift_log` as its first step receives a significantly higher relative advantage than agents that go straight to diagnostics.
 
 ---
 
-## 🧪 Post-Training Analysis: The Behavioral Shift
+## 🚀 Comprehensive Usage Flow
 
-What actually happens inside the model when it moves from "Base" to "Trained"? Our empirical analysis reveals a fundamental shift in the agent's decision-making logic.
+### 1. The Sandbox (Human-in-the-Loop)
+Before training, use the **"🎮 Interactive Control"** tab to experience the environment manually:
+1.  **Reset Environment**: Click the reset button to generate a new procedural incident shift.
+2.  **Observe Symptoms**: Read the service status and logs.
+3.  **The Causal Trap**: Notice when an incident (e.g., "Auth Failure") doesn't have an obvious local cause. 
+4.  **Resolve**: Use the `read_shift_log` tool. If you find a precursor, you've solved the causal link!
 
-### 1. The "Aha!" Moment: Step 80
-During the GRPO run, we observed a critical inflection point around **Step 80**. Before this, the model treated the `read_shift_log` tool as a "fallback" — only calling it after traditional diagnostics failed. Post-Step 80, the model developed a **proactive retrieval policy**: it identifies the service name in the alert and immediately checks the log for precursors.
+### 2. The Training Pipeline (Autonomous)
+To begin the 3-stage optimization:
+1.  **Enable Training**: Ensure `TRAIN_ENABLED=1` is set in your Space secrets.
+2.  **Trigger Stage A**: Click "Start Training". The daemon will initialize the **Qwen2.5-1.5B** base model.
+3.  **Monitor Live**: Switch to the **"📈 Training Telemetry"** tab to see real-time Reward, Recall Rate, and Vibe Ratio curves.
+4.  **Auto-Upload**: Once Stage C completes, the daemon will package the LoRA adapter, training curves, and eval plots, pushing them directly to your model repository.
 
-### 2. Case Study: Incident #7 (The Cascade)
-*   **Base Model Performance**: Faced with the "Auth Cascade," the untrained model spent 18 steps running network diagnostics, checking API logs, and restarting pods. It eventually "guessed" the DB pool issue but had no evidence for why it happened.
-*   **Trained Model Performance**: Within **2 steps**, the model called `read_shift_log(query="auth db")`. It found the entry from Incident #1 ("DB pool at 80%"), realized this was the root cause, and applied the correct mitigation immediately.
-*   **Result**: MTTR dropped from **~420s to 84s** for this specific incident family.
-
-### 3. The "Real-World" Impact in Numbers
-Translating RL tool-call counts into SRE operational reality, the GRPO-trained policy provides:
-
-*   **MTTR Reduction (Time)**: Assuming a conservative 2 minutes per diagnostic tool-call in a real system, the trained agent resolves cascading outages in **6 minutes**, compared to **36 minutes** for the base LLM. A **30-minute operational gain** per incident.
-*   **Inference Cost Savings**: By reducing the average tool-call sequence from 18 calls to 3 calls, we achieve an **83.3% reduction in token consumption** per resolution.
-*   **Context Efficiency**: The base model's context grows linearly with every failed diagnostic, reaching **~15k tokens**. The trained model resolves using only **~1.8k tokens**, bypassing accuracy decay.
-
-### 4. Qualitative Evolution of Memory
-We observed a marked improvement in the **Density of Information** in the shift log:
-*   **Early Training**: Log entries were verbose and narrative ("I looked at the server and it was down so I fixed it").
-*   **Late Training**: Log entries became structured "causal flags" ("PaymentDB: Pool usage 82%. Risk: Auth service timeouts under >10k RPS"). 
-*   **Why?** The GRPO Reward **R3 (Quality)** and **R4 (Integrity)** explicitly penalized "word salad" and rewarded entries that contained high-overlap keywords with the true root cause.
+### 3. Verification & Results
+Visit the **"📊 Results Dashboard"** to see:
+- **MTTR Comparison**: How much faster the model resolves incidents after training.
+- **Causal Recall (R2)**: The probability that the model "looked before it leaped."
+- **Convergence Curves**: Loss and Accuracy snapshots from the latest run.
 
 ---
 
-## 🛠 What the Model Learns
+## 🖥 Deployment & Configuration
 
-1. **Proactive Logging**: The model learns to write shift log entries for unusual system state changes that carry downstream risk, not just trivial fixes.
-2. **Selective Recall**: The model learns to call `read_shift_log` *before* running diagnostics when service topology suggests a potential causal link.
-3. **Memory Hygiene**: Under a 2,000-token cap, the model learns to discard irrelevant metadata (ticket IDs) while preserving critical health states and risk flags.
-
----
-
-## 🖥️ Interactive Observatory
-
-The project includes a **Gradio-based Observatory** for real-time monitoring and replaying RL episodes.
-
-![Observatory UI](plots/observatory_ui.png)
-
----
-
-## 🖥 Deployment — Dual-Server Design
-
-Exposes two interfaces on port 7860:
-- **Gradio Observatory**: Glassmorphism dashboard for real-time monitoring and replaying episodes.
-- **FastAPI OpenEnv**: Standardized API for RL agents (`/reset`, `/step`, `/state`).
+### Environment Variables
+| Variable | Purpose |
+|---|---|
+| `TRAIN_ENABLED` | Set to `1` to allow background GPU training. |
+| `HF_TOKEN` | Write-access token for uploading adapters to the Hub. |
+| `WANDB_API_KEY` | (Optional) To track training on Weights & Biases. |
 
 ### Repository Structure
 ```
 shiftlog-gym/
 ├── shiftlog_gym/
-│   ├── server/         ← FastAPI + OpenEnv endpoints
-│   ├── core/           ← Simulator, scenarios, and reward rubrics
-│   └── diagnostics/    ← Startup validation + log parsing
-├── observatory/        ← 5-tab Gradio dashboard UI
-├── train/              ← SFT and GRPO training pipelines
-├── plots/              ← Real training evidence assets
-├── tests/              ← Unit tests for environment logic
-├── openenv.yaml        ← OpenEnv manifest
-└── Dockerfile          ← Deployment container
+│   ├── trl_env.py      ← OpenEnv compatible RL wrapper
+│   ├── simulator.py    ← Causal SRE environment engine
+│   ├── rewards.py      ← Multi-dimensional PRM rubric
+│   └── server/         ← FastAPI endpoints for external agents
+├── train/
+│   ├── pipeline.py     ← SFT + GRPO implementation
+│   └── daemon.py       ← Thread controller for HF Spaces
+├── observatory/
+│   └── gradio_app.py   ← 5-tab Glassmorphism dashboard
+└── Dockerfile          ← Hardware-optimized container
 ```
+
+---
+
+## 👤 Author & Hackathon
+**ShiftLog-Gym** was built for the **Meta PyTorch OpenEnv Hackathon 2026** by **Chirag Aswal**. 
+It represents a "Wild Card" entry focusing on the intersection of **Long-Context Memory**, **Causal Reasoning**, and **Operational Efficiency**.
+
+<div align="center">
+  <br/>
+  🚀 **[Launch the Observatory on HuggingFace](https://huggingface.co/spaces/Chirag0123/shiftlog-gym)**
+</div>
 
 ---
 
