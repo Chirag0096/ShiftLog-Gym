@@ -49,41 +49,11 @@ The deeper failure: every memory solution — ChatGPT Memory, Claude Projects, G
 
 ---
 
-## 🏗 System Architecture & Data Sync
+## 🏗 Architecture & Workflow
 
-ShiftLog-Gym is designed as a **fused hybrid application**, running both a high-performance RL environment and a real-time observability dashboard within a single Docker container.
+ShiftLog-Gym simulates a complete **8-hour SRE on-call shift** across 12 sequential incidents. Three incident pairs are causally linked — their correct resolution requires the agent to have written and retrieved prior shift log entries.
 
-### The Connectivity Matrix
-
-```mermaid
-graph TD
-    subgraph Space
-        direction TB
-        UI[Gradio Observatory Dashboard]
-        API[FastAPI OpenEnv API]
-        Daemon[Background Training Daemon]
-        Sim[ShiftLog Simulator]
-        
-        UI --- Sim
-        API --- Sim
-        Daemon --> Sim
-        Daemon --> SharedState[Live Shared State]
-        SharedState --> UI
-    end
-    
-    subgraph Hub
-        direction TB
-        Repo[Model Repository]
-        Weights[LoRA Adapters]
-        Metrics[Performance Metrics]
-        Stages[Stage Markers]
-    end
-    
-    Daemon --> Weights
-    Daemon --> Metrics
-    Daemon --> Stages
-    UI --> Metrics
-```
+![Architecture Flow](plots/architecture_flow.jpg)
 
 
 ### How "Sync" Works
