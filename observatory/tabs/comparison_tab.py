@@ -101,7 +101,6 @@ def build_comparison_tab():
                 base_trajectory = gr.Chatbot(
                     label="Base model trajectory",
                     height=400,
-                    type="messages",
                 )
 
             # ── Trained model column ──────────────────────────────────────
@@ -126,7 +125,6 @@ def build_comparison_tab():
                 trained_trajectory = gr.Chatbot(
                     label="Trained model trajectory",
                     height=400,
-                    type="messages",
                 )
 
         # ── Verdict panel ─────────────────────────────────────────────────
