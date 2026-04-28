@@ -145,6 +145,43 @@ Traditional RL (PPO) often struggles with the sparse rewards of SRE tasks. We us
 
 ---
 
+## 🆚 Why Not Just Use RAG for Log Memory?
+
+This is the most important question. Every major observability platform (Datadog, PagerDuty, Splunk, Grafana) already has vector search over logs. Why does ShiftLog-Gym beat them?
+
+### The 4 Reasons RAG Fails for On-Call SRE Memory
+
+**Reason 1 — RAG retrieves. It doesn't decide what's worth retrieving.**
+
+A RAG system over production logs will return you the 500 most recent log lines from the payment-db service. That's not the same as knowing that the log line *"connection pool at 80% — auth service at risk under load"* from 4 hours ago is the ONE line that explains incident #7. RAG requires you to ask the right question. A trained agent learns to know WHICH question to ask — and to ask it before every causally-linked incident.
+
+**Reason 2 — RAG doesn't write. You do.**
+
+Production log systems store millions of lines. The SRE's job during an incident is to add *structure* to the noise — to write a 2-line shift log entry that captures the causal fact that the raw logs bury. RAG can search what exists. It cannot decide what a future engineer needs to find. ShiftLog-Gym trains the model to make that write decision with RL reward: log entries that help resolve future incidents earn reward.
+
+**Reason 3 — RAG has no causal model. It has similarity search.**
+
+Vector similarity finds entries that *look like* the current incident. Causal memory finds entries that *caused* the current incident. These are different operations. Incident #7 (auth 503s) doesn't look textually similar to incident #1 (DB pool 80%). But it was caused by it. Embedding distance doesn't capture causality. A trained memory policy does.
+
+**Reason 4 — RAG adds latency and infra cost at every step.**
+
+A vector search call to Pinecone/Weaviate/pgvector at every incident step adds 50–200ms of latency plus infrastructure cost. The ShiftLog-Gym trained model carries its memory policy in its weights — zero additional latency, zero additional API calls, zero additional infra.
+
+### The Comparison Table
+
+| Capability | RAG over logs | ShiftLog-Gym trained model |
+|---|:---:|:---:|
+| Can search prior incidents | ✅ | ✅ |
+| Decides what's worth writing | ❌ | ✅ |
+| Understands causal vs. similar | ❌ | ✅ |
+| Learns from shift experience | ❌ | ✅ |
+| Zero-latency at inference | ❌ | ✅ |
+| Improves across shifts | ❌ | ✅ (R8 handoff reward) |
+
+**ShiftLog-Gym doesn't replace your log pipeline.** It trains the AI that reads it to actually understand it — not just search it.
+
+---
+
 ## 🚀 Comprehensive Usage Flow
 
 ### 1. The Sandbox (Human-in-the-Loop)

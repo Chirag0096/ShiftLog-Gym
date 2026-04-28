@@ -1,4 +1,4 @@
-"""ShiftLog-Gym Observatory — 5-tab Gradio dashboard."""
+"""ShiftLog-Gym Observatory — Gradio dashboard with innovation tabs."""
 from __future__ import annotations
 import json, os, time, subprocess, sys
 from pathlib import Path
@@ -7,6 +7,12 @@ import pandas as pd
 import httpx
 import threading
 from train.space_training_daemon import run_training, get_state
+
+# Import innovation tabs
+from observatory.tabs.comparison_tab import build_comparison_tab
+from observatory.tabs.knowledge_graph_tab import build_knowledge_graph_tab
+from observatory.tabs.metrics_tab import build_metrics_tab
+from observatory.tabs.ablation_tab import build_ablation_tab
 
 ROOT     = Path(__file__).resolve().parent.parent
 OBS      = ROOT / "observatory"
@@ -572,6 +578,24 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             """)
             
             gr.HTML('<div style="max-width:860px;margin:0 auto;color:#e2e8f0;font-family:Inter,sans-serif">' + STORY_HTML + '</div>')
+
+        # ──────────────────────────────────────────────────────────────────
+        # INNOVATION TABS (Phase 3 Hackathon Additions)
+        # ──────────────────────────────────────────────────────────────────
+
+        # TAB: Base vs Trained Model Comparison
+        build_comparison_tab()
+
+        # TAB: Knowledge Graph (Services, Causal Chains, Memory)
+        build_knowledge_graph_tab()
+
+        # TAB: Live Training Metrics
+        build_metrics_tab()
+
+        # TAB: Reward Ablation Study
+        build_ablation_tab()
+
+        # ──────────────────────────────────────────────────────────────────
 
         # TAB 4 — API Explorer
         with gr.Tab("⚙️ API Explorer"):
