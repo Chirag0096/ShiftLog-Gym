@@ -71,3 +71,9 @@ class EpisodeMetrics:
     tool_timeline: list[dict[str, object]] = field(default_factory=list)
     memory_events: list[dict[str, object]] = field(default_factory=list)
 
+    @property
+    def vibe_coding_ratio(self) -> float:
+        if self.action_on_linked_count == 0:
+            return 0.0
+        return round(self.blind_action_count / self.action_on_linked_count, 4)
+
