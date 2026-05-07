@@ -702,6 +702,12 @@ class ColabTrainingPipeline:
         out_dir = self.outputs_dir / "grpo-stagec"
         out_dir.mkdir(parents=True, exist_ok=True)
 
+        canonical_card = Path("model_card.md")
+        if canonical_card.exists():
+            (out_dir / "README.md").write_text(canonical_card.read_text(encoding="utf-8"), encoding="utf-8")
+            print(f"✅ Model card copied from {canonical_card}")
+            return
+
         try:
             import wandb as _wandb
             wandb_url = _wandb.run.url if _wandb.run else ""

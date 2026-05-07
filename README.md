@@ -14,7 +14,7 @@ license: mit
 ### *The First Domain-Specific RL Environment for SRE Causal Memory*
 
 [![HuggingFace Space](https://img.shields.io/badge/%F0%9F%A4%97%20Space-Live%20Demo-blue?style=for-the-badge)](https://huggingface.co/spaces/Chirag0123/shiftlog-gym)
-[![Trained Model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-Qwen2.5--3B-green?style=for-the-badge)](https://huggingface.co/Chirag0123/shiftlog-gym-qwen-memory-policy)
+[![Trained Model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-Qwen2.5--1.5B-green?style=for-the-badge)](https://huggingface.co/Chirag0123/shiftlog-gym-qwen-memory-policy)
 [![WandB](https://img.shields.io/badge/%F0%9F%93%8A%20WandB-Training%20Run-orange?style=for-the-badge)](https://wandb.ai/chiragaswal2/huggingface/runs/dk3g49l4)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
@@ -295,6 +295,15 @@ uvicorn shiftlog_gym.server.app:app --port 7860
 ## 👤 About the Author
 
 **Chirag Aswal** — Backend Engineer at AT&T (Java/Spring Boot). The failure scenarios in ShiftLog-Gym draw directly from production experience: real cascading failure patterns, real on-call memory failure modes, and real runbook gaps that cause repeated outages.
+
+---
+
+## Submission Artifacts
+
+- Blog draft for Hugging Face publication: [blog_post.md](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/blog_post.md:1)
+- 2-minute demo recording script: [demo_video_script.md](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/demo_video_script.md:1)
+- Model repo README content: [model_card.md](/Users/chiragaswal/Developer/Personal%20Doc/Vibe%20Projects/MetaHack/model_card.md:1)
+- Publish the blog and video, then replace these local artifacts with the final public URLs before submission.
 
 ---
 

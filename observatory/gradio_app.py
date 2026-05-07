@@ -13,6 +13,7 @@ from observatory.tabs.comparison_tab import build_comparison_tab
 from observatory.tabs.knowledge_graph_tab import build_knowledge_graph_tab
 from observatory.tabs.metrics_tab import build_metrics_tab
 from observatory.tabs.ablation_tab import build_ablation_tab
+from observatory.tabs.inference_tab import build_inference_tab
 
 ROOT     = Path(__file__).resolve().parent.parent
 OBS      = ROOT / "observatory"
@@ -520,7 +521,10 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             next_btn.click(fn=next_step, inputs=[chatbot, step_state],
                            outputs=[chatbot, step_state, incident_info])
 
-        # TAB 2 — Training Results
+        # TAB 2 — Try the trained model
+        build_inference_tab()
+
+        # TAB 3 — Training Results
         with gr.Tab("📈 Results"):
             t2_banner = gr.Markdown(value="⌛ Loading results...")
             t2_cards  = gr.HTML(value="<div>Loading metrics...</div>")
@@ -543,7 +547,7 @@ the previous shift — but only if the agent <strong style="color:#38bdf8">reads
             ref_btn = gr.Button("🔄 Refresh Results", variant="secondary")
             ref_btn.click(fn=refresh_results, outputs=[t2_banner, t2_cards, plot_reward, plot_recall, plot_mttr, img1, img2, img3])
 
-        # TAB 3 — Research Story
+        # TAB 4 — Research Story
         with gr.Tab("🔬 Research Story"):
             gr.Markdown("""
             ## The Causal Memory Challenge
