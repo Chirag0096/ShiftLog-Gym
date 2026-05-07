@@ -239,18 +239,20 @@ def _run_inference(incident_text: str, max_steps_val: int):
             messages,
             return_tensors="pt",
             add_generation_prompt=True,
+            return_dict=True,
         ).to(device)
 
         with torch.no_grad():
             output = model.generate(
-                inputs,
+                **inputs,
                 max_new_tokens=150,
                 do_sample=False,
                 pad_token_id=tok.eos_token_id,
                 eos_token_id=tok.eos_token_id,
             )
 
-        response = tok.decode(output[0][inputs.shape[1]:], skip_special_tokens=True).strip()
+        input_len = inputs["input_ids"].shape[1]
+        response = tok.decode(output[0][input_len:], skip_special_tokens=True).strip()
         tool, arguments = _extract_action(response, service_hint)
 
         steps_taken += 1
